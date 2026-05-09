@@ -1,0 +1,20 @@
+# Xcode build artifacts and per-user state
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.pins
+Package.resolved
+
+# macOS junk
+.DS_Store
+
+# Secrets — NEVER commit API keys, tokens, etc.
+.env
+*.env
+secrets.plist
