@@ -1,0 +1,579 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Dumbbell,
+  MoreHorizontal,
+  Plus,
+  StickyNote,
+  Timer,
+  Trash2,
+  X,
+} from "lucide-react";
+
+import { EmptyState } from "@/components/empty-state";
+import { ExercisePicker } from "@/components/exercise-picker";
+import { RestTimerBar } from "@/components/gym/rest-timer-bar";
+import {
+  SetEditorSheet,
+  type SetEditorTarget,
+} from "@/components/gym/set-editor-sheet";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { useCountUp } from "@/hooks/use-count-up";
+import { formatNumber } from "@/lib/format";
+import { getExercise } from "@/lib/exercises";
+import {
+  estimate1RM,
+  sessionCalories,
+  sessionDurationMin,
+  sessionVolume,
+} from "@/lib/fitness";
+import type { Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
+import { previousSets, useWorkoutStore } from "@/stores/workout-store";
+import { cn } from "@/lib/utils";
+
+function useTick(intervalMs: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+/** Keep the screen awake mid-workout (best effort). */
+function useWakeLock() {
+  useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
+    const request = async () => {
+      try {
+        const nav = navigator as Navigator & {
+          wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
+        };
+        if (!nav.wakeLock) return;
+        const acquired = await nav.wakeLock.request("screen");
+        if (cancelled) acquired.release();
+        else lock = acquired;
+      } catch {
+        // Denied or unsupported — non-fatal.
+      }
+    };
+    request();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") request();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      lock?.release();
+    };
+  }, []);
+}
+
+function SetRow({
+  we,
+  set,
+  index,
+  prev,
+  exerciseName,
+  isBarbell,
+  onEdit,
+}: {
+  we: WorkoutExercise;
+  set: SetEntry;
+  index: number;
+  prev: SetEntry | undefined;
+  exerciseName: string;
+  isBarbell: boolean;
+  onEdit: (t: SetEditorTarget) => void;
+}) {
+  const toggleSetComplete = useWorkoutStore((s) => s.toggleSetComplete);
+  const deleteSet = useWorkoutStore((s) => s.deleteSet);
+  const updateSet = useWorkoutStore((s) => s.updateSet);
+
+  const open = (field: SetEditorTarget["field"]) =>
+    onEdit({
+      field,
+      weId: we.id,
+      setId: set.id,
+      exerciseName,
+      isBarbell,
+      value:
+        field === "weight" ? set.weight : field === "reps" ? set.reps : set.rir ?? 2,
+      note: set.note,
+    });
+
+  const chip =
+    "flex h-11 items-center justify-center rounded-lg border border-border bg-surface-raised font-mono text-sm transition-colors hover:border-border-hover";
+
+  return (
+    <motion.div
+      layout
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.35}
+      onDragEnd={(_, info) => {
+        if (info.offset.x < -110) deleteSet(we.id, set.id);
+      }}
+      className={cn(
+        "grid grid-cols-[1.5rem_3.5rem_1fr_1fr_2.75rem_2.75rem] items-center gap-2",
+        set.pr && "rounded-lg bg-accent-dim/40"
+      )}
+    >
+      <span className="text-center font-mono text-xs text-text-tertiary">
+        {index + 1}
+      </span>
+      <button
+        type="button"
+        onClick={() =>
+          prev && updateSet(we.id, set.id, { weight: prev.weight, reps: prev.reps })
+        }
+        disabled={!prev}
+        aria-label={prev ? `Copy previous ${prev.weight} by ${prev.reps}` : "No previous data"}
+        className={cn(
+          "h-11 truncate rounded-lg text-center font-mono text-xs leading-[2.75rem] text-text-tertiary transition-colors",
+          prev ? "hover:bg-muted hover:text-text-secondary" : "cursor-default"
+        )}
+      >
+        {prev ? `${prev.weight}×${prev.reps}` : "—"}
+      </button>
+      <button type="button" onClick={() => open("weight")} className={chip}>
+        {set.weight || "—"}
+      </button>
+      <button type="button" onClick={() => open("reps")} className={chip}>
+        {set.reps || "—"}
+      </button>
+      <button
+        type="button"
+        onClick={() => open("rir")}
+        aria-label="RIR"
+        className={cn(chip, "text-xs", set.rir === null && "text-text-tertiary")}
+      >
+        {set.rir === null ? "RIR" : set.rir === 6 ? "5+" : set.rir}
+      </button>
+      <button
+        type="button"
+        onClick={() => toggleSetComplete(we.id, set.id)}
+        aria-label={set.completed ? "Mark set incomplete" : "Complete set"}
+        className={cn(
+          "flex h-11 items-center justify-center rounded-lg border transition-colors",
+          set.completed
+            ? "border-accent bg-accent text-background"
+            : "border-border-hover text-text-tertiary hover:border-accent hover:text-accent"
+        )}
+      >
+        <Check className="size-4" strokeWidth={3} />
+      </button>
+    </motion.div>
+  );
+}
+
+export default function ActiveWorkoutPage() {
+  const router = useRouter();
+  const active = useWorkoutStore((s) => s.active);
+  const sessions = useWorkoutStore((s) => s.sessions);
+  const customExercises = useWorkoutStore((s) => s.customExercises);
+  const addSet = useWorkoutStore((s) => s.addSet);
+  const updateSet = useWorkoutStore((s) => s.updateSet);
+  const addExerciseToActive = useWorkoutStore((s) => s.addExerciseToActive);
+  const removeExerciseFromActive = useWorkoutStore((s) => s.removeExerciseFromActive);
+  const moveExercise = useWorkoutStore((s) => s.moveExercise);
+  const setExerciseRest = useWorkoutStore((s) => s.setExerciseRest);
+  const finishWorkout = useWorkoutStore((s) => s.finishWorkout);
+  const discardWorkout = useWorkoutStore((s) => s.discardWorkout);
+
+  const [editor, setEditor] = useState<SetEditorTarget | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [note, setNote] = useState("");
+
+  useWakeLock();
+  const now = useTick(1000);
+
+  const prevByExercise = useMemo(() => {
+    const map = new Map<string, SetEntry[]>();
+    if (!active) return map;
+    for (const we of active.exercises) {
+      if (!map.has(we.exerciseId))
+        map.set(we.exerciseId, previousSets(sessions, we.exerciseId));
+    }
+    return map;
+  }, [active, sessions]);
+
+  const volume = active ? sessionVolume(active) : 0;
+  const animatedVolume = useCountUp(volume);
+
+  if (!active) {
+    return (
+      <div className="mx-auto w-full max-w-md px-4 py-16">
+        <EmptyState
+          icon={Dumbbell}
+          description="No workout in progress."
+          actionLabel="Back to Gym"
+          onAction={() => router.push("/gym")}
+        />
+      </div>
+    );
+  }
+
+  const elapsed = Math.max(0, now - active.startedAt);
+  const mins = Math.floor(elapsed / 60000);
+  const secs = Math.floor((elapsed % 60000) / 1000);
+  const prCount = active.exercises.reduce(
+    (a, we) => a + we.sets.filter((s) => s.completed && s.pr).length,
+    0
+  );
+  const completedSets = active.exercises.reduce(
+    (a, we) => a + we.sets.filter((s) => s.completed).length,
+    0
+  );
+  const musclesHit = [
+    ...new Set(
+      active.exercises
+        .filter((we) => we.sets.some((s) => s.completed))
+        .map((we) => getExercise(we.exerciseId, customExercises)?.muscle)
+        .filter((m): m is Muscle => !!m)
+    ),
+  ];
+
+  return (
+    <div className="flex min-h-screen flex-col pb-40">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <span className="text-[0.65rem] text-text-tertiary">time</span>
+              <span className="font-mono text-lg font-medium leading-none">
+                {mins}:{String(secs).padStart(2, "0")}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[0.65rem] text-text-tertiary">volume</span>
+              <span className="font-mono text-lg font-medium leading-none">
+                {formatNumber(animatedVolume)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[0.65rem] text-text-tertiary">PRs</span>
+              <span
+                className={cn(
+                  "font-mono text-lg font-medium leading-none",
+                  prCount > 0 && "text-accent"
+                )}
+              >
+                {prCount}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmDiscard(true)}
+            >
+              <X data-icon="inline-start" className="size-3.5" />
+              Discard
+            </Button>
+            <Button size="sm" onClick={() => setEndOpen(true)}>
+              End workout
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-4">
+        {active.exercises.length === 0 && (
+          <EmptyState
+            icon={Dumbbell}
+            description="Empty session. Add your first exercise."
+            actionLabel="Add exercise"
+            onAction={() => setPickerOpen(true)}
+          />
+        )}
+        {active.exercises.map((we, i) => {
+          const ex = getExercise(we.exerciseId, customExercises);
+          const prev = prevByExercise.get(we.exerciseId) ?? [];
+          const isBarbell = ex?.equipment === "barbell";
+          const topSet = we.sets.reduce(
+            (best, s) =>
+              s.completed && s.weight * s.reps > best.weight * best.reps ? s : best,
+            { weight: 0, reps: 0 } as Pick<SetEntry, "weight" | "reps">
+          );
+          return (
+            <section
+              key={we.id}
+              className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <h2 className="truncate text-sm font-medium">
+                    {ex?.name ?? we.exerciseId}
+                  </h2>
+                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[0.65rem] text-text-tertiary">
+                    {ex?.muscle}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {topSet.weight > 0 && (
+                    <span className="mr-1 font-mono text-[0.65rem] text-text-tertiary">
+                      e1RM {estimate1RM(topSet.weight, topSet.reps)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1 font-mono text-[0.65rem] text-text-tertiary">
+                    <Timer className="size-3" />
+                    {we.restSeconds}s
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      aria-label="Exercise options"
+                      className="rounded p-1 text-text-tertiary transition-colors hover:bg-muted hover:text-text-primary"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => moveExercise(we.id, -1)} disabled={i === 0}>
+                        <ArrowUp className="size-3.5" /> Move up
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => moveExercise(we.id, 1)}
+                        disabled={i === active.exercises.length - 1}
+                      >
+                        <ArrowDown className="size-3.5" /> Move down
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setExerciseRest(
+                            we.id,
+                            we.restSeconds >= 180 ? 60 : we.restSeconds + 30
+                          )
+                        }
+                      >
+                        <Timer className="size-3.5" /> Rest: {we.restSeconds}s (tap to cycle)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => removeExerciseFromActive(we.id)}
+                      >
+                        <Trash2 className="size-3.5" /> Remove exercise
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1.5rem_3.5rem_1fr_1fr_2.75rem_2.75rem] gap-2 text-center text-[0.65rem] text-text-tertiary">
+                <span>set</span>
+                <span>prev</span>
+                <span>lb</span>
+                <span>reps</span>
+                <span>RIR</span>
+                <span />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {we.sets.map((set, idx) => (
+                  <div key={set.id} className="flex flex-col gap-1">
+                    <SetRow
+                      we={we}
+                      set={set}
+                      index={idx}
+                      prev={prev[idx] ?? prev[prev.length - 1]}
+                      exerciseName={ex?.name ?? we.exerciseId}
+                      isBarbell={isBarbell}
+                      onEdit={setEditor}
+                    />
+                    {set.note && (
+                      <span className="pl-8 text-xs text-text-tertiary">
+                        “{set.note}”
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => addSet(we.id)}>
+                  <Plus data-icon="inline-start" className="size-3.5" />
+                  Add set
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    we.sets.length > 0 &&
+                    setEditor({
+                      field: "note",
+                      weId: we.id,
+                      setId: we.sets[we.sets.length - 1].id,
+                      exerciseName: ex?.name ?? we.exerciseId,
+                      isBarbell,
+                      value: 0,
+                      note: we.sets[we.sets.length - 1].note,
+                    })
+                  }
+                >
+                  <StickyNote data-icon="inline-start" className="size-3.5" />
+                  Note
+                </Button>
+              </div>
+            </section>
+          );
+        })}
+
+        {active.exercises.length > 0 && (
+          <Button variant="outline" onClick={() => setPickerOpen(true)}>
+            <Plus data-icon="inline-start" className="size-4" />
+            Add exercise
+          </Button>
+        )}
+        <p className="text-center text-xs text-text-tertiary">
+          Swipe a set left to delete it. Tap prev to copy last session.
+        </p>
+      </main>
+
+      <RestTimerBar />
+
+      <SetEditorSheet
+        target={editor}
+        onClose={() => setEditor(null)}
+        onCommit={(patch) => {
+          if (editor) updateSet(editor.weId, editor.setId, patch);
+        }}
+      />
+
+      <ExercisePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={(ex) => addExerciseToActive(ex.id)}
+      />
+
+      <Dialog open={endOpen} onOpenChange={setEndOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Workout summary</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-border bg-surface-raised p-3">
+              <p className="text-xs text-text-tertiary">Total time</p>
+              <p className="font-mono text-xl font-medium">
+                {sessionDurationMin(active)} min
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface-raised p-3">
+              <p className="text-xs text-text-tertiary">Volume</p>
+              <p className="font-mono text-xl font-medium">
+                {formatNumber(volume)} lb
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface-raised p-3">
+              <p className="text-xs text-text-tertiary">PRs hit</p>
+              <p
+                className={cn(
+                  "font-mono text-xl font-medium",
+                  prCount > 0 && "text-accent"
+                )}
+              >
+                {prCount}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface-raised p-3">
+              <p className="text-xs text-text-tertiary">Est. calories</p>
+              <p className="font-mono text-xl font-medium">
+                {sessionCalories(active)}
+              </p>
+            </div>
+          </div>
+          {musclesHit.length > 0 && (
+            <p className="text-xs text-text-secondary">
+              Trained: {musclesHit.join(", ")}
+            </p>
+          )}
+          {completedSets === 0 && (
+            <p className="text-xs text-warning">
+              No completed sets — ending now will discard this session.
+            </p>
+          )}
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Workout note (optional)"
+            rows={2}
+          />
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setEndOpen(false)}>
+              Keep going
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                finishWorkout(note.trim() || undefined);
+                router.push("/gym");
+              }}
+            >
+              Save workout
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Discard this workout?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary">
+            {completedSets} completed set{completedSets === 1 ? "" : "s"} will be
+            lost. This can&apos;t be undone.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmDiscard(false)}
+            >
+              Keep workout
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                discardWorkout();
+                router.push("/gym");
+              }}
+            >
+              Discard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="fixed left-4 top-3 z-40 md:hidden" aria-hidden>
+        <Link href="/gym" className="sr-only">
+          Back to gym
+        </Link>
+      </div>
+    </div>
+  );
+}

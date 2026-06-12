@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
+import { cn } from "@/lib/utils";
+
 interface RingProps {
   /** Progress from 0 to 100. */
   value: number;
@@ -11,6 +13,7 @@ interface RingProps {
   color?: string;
   label?: string;
   sublabel?: string;
+  linecap?: "round" | "butt";
 }
 
 export function Ring({
@@ -20,6 +23,7 @@ export function Ring({
   color = "var(--accent)",
   label,
   sublabel,
+  linecap = "round",
 }: RingProps) {
   const reduced = useReducedMotion();
 
@@ -63,7 +67,7 @@ export function Ring({
           fill="none"
           stroke={color}
           strokeWidth={strokeWidth}
-          strokeLinecap="round"
+          strokeLinecap={linecap}
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: offset }}
@@ -76,7 +80,14 @@ export function Ring({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {label && (
-          <span className="font-mono text-2xl font-medium">{label}</span>
+          <span
+            className={cn(
+              "font-mono font-medium",
+              label.length > 5 ? "text-sm" : "text-2xl"
+            )}
+          >
+            {label}
+          </span>
         )}
         {sublabel && (
           <span className="text-xs text-text-tertiary">{sublabel}</span>

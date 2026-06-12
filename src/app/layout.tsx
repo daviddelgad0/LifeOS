@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Atmosphere } from "@/components/atmosphere";
 import { MotionProvider } from "@/components/motion-provider";
+import { AppShell } from "@/components/shell/app-shell";
+import { SWRegister } from "@/components/sw-register";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,10 +25,24 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "LifeOS",
   description: "Personal life dashboard — workouts, school, and coaching.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "LifeOS",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -40,7 +57,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Atmosphere />
-        <MotionProvider>{children}</MotionProvider>
+        <MotionProvider>
+          <AppShell>{children}</AppShell>
+        </MotionProvider>
+        <Toaster position="top-center" />
+        <SWRegister />
       </body>
     </html>
   );
