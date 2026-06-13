@@ -28,6 +28,12 @@ import { RoutineEditor } from "@/components/gym/routine-editor";
 import { CustomExerciseDialog } from "@/components/gym/custom-exercise-dialog";
 import { allExercises, getExercise } from "@/lib/exercises";
 import { MUSCLES } from "@/lib/fitness";
+import {
+  READINESS_COLOR,
+  readiness,
+  readinessCopy,
+  whoopToday,
+} from "@/lib/whoop";
 import type { Exercise, Muscle, Routine } from "@/lib/types";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { cn } from "@/lib/utils";
@@ -63,8 +69,20 @@ export function GymLogTab() {
     router.push("/gym/workout");
   };
 
+  const whoop = whoopToday();
+
   return (
     <div className="flex flex-col gap-8">
+      {!active && (
+        <p
+          className="rounded-xl border bg-surface px-4 py-3 text-sm text-text-secondary"
+          style={{
+            borderColor: `color-mix(in srgb, ${READINESS_COLOR[readiness(whoop.recovery)]} 35%, transparent)`,
+          }}
+        >
+          {readinessCopy(whoop)}
+        </p>
+      )}
       {active && (
         <button
           type="button"

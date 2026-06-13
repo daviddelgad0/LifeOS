@@ -13,6 +13,15 @@ export interface CoachContext {
   deadliftTop: number | null;
   staleMuscles: string[];
   profileComplete: boolean;
+  /** Whoop feed (simulated until Phase 2 OAuth) */
+  recovery: number;
+  strainToday: number;
+  strainTarget: string;
+  sleepHours: number;
+  sleepNeeded: number;
+  hrv: number;
+  gymWindow: string;
+  bedtime: string;
 }
 
 const lb = (n: number | null) => (n ? `${n} lb` : "—");
@@ -46,7 +55,20 @@ export function coachReply(message: string, ctx: CoachContext): string {
   if (has(/\b(pr|personal record|new best)\b/)) {
     return `${o}That's earned, not lucky — ${ctx.workoutsLogged} sessions in the log is why it happened. Take the win today. Next exposure, don't chase a new max: own this weight for 2-3 clean reps, then we nudge it.`;
   }
-  if (has(/\b(deload|recover\w*)\b/)) {
+  if (has(/\b(best|optimal|when|what time)\b.*\b(gym|train\w*|lift\w*|work\s?out)\b/)) {
+    return `${o}Your energy model says ${ctx.gymWindow} is your window today — recovery's at ${ctx.recovery}% and that's when the curve peaks. If life gets in the way, any time beats no time, but protect that slot when you can.`;
+  }
+  if (has(/\b(whoop|recovery|readiness|hrv|strain)\b/)) {
+    const r = ctx.recovery;
+    const verdict =
+      r >= 67
+        ? `you're green — go earn some strain, target ${ctx.strainTarget}`
+        : r >= 34
+          ? `you're yellow — train, but cap it around ${ctx.strainTarget} strain and leave reps in reserve`
+          : `you're red — today is a walk and an early night, not a session`;
+    return `${o}This morning: recovery ${r}%, HRV ${ctx.hrv} ms, ${ctx.sleepHours}h of the ${ctx.sleepNeeded}h you needed, strain so far ${ctx.strainToday}. Reading: ${verdict}. Best window if you train: ${ctx.gymWindow}.`;
+  }
+  if (has(/\b(deload)\b/)) {
     return `${o}With a ${ctx.workoutStreak}-day streak going, a deload isn't weakness — it's how you cash in the fatigue for strength. Take a week at 60% of your usual weights, same movements, leave 4 reps in the tank. You'll come back sharper.`;
   }
   if (has(/\b(bench|squat|deadlift|ohp|press|row|lift\w*|plateau|progress\w*)\b/)) {
@@ -60,7 +82,8 @@ export function coachReply(message: string, ctx: CoachContext): string {
     return `${o}Simple math at ${w} lb: protein ${Math.round(w * 0.9)}-${Math.round(w)} g a day, every day. Maintenance is roughly ${Math.round(w * 15)} kcal — eat ~300 over to gain, ~400 under to cut. Track for two weeks before trusting any of those numbers; your scale trend is the truth, the formula is the guess.`;
   }
   if (has(/\b(tired|exhausted|sleep|fatigued|drained)\b/)) {
-    return `${o}Tired is data. Before you blame the program: how many hours did you sleep this week? Under 7 a night and no plan survives. Tonight — screens off early, same bedtime, and tomorrow's session becomes 3 hard sets per lift instead of 5. Recovery is training.`;
+    const debt = Math.max(0, ctx.sleepNeeded - ctx.sleepHours);
+    return `${o}Tired is data, and yours says it plainly: ${ctx.sleepHours}h last night against ${ctx.sleepNeeded}h needed${debt > 0.4 ? ` — ${debt.toFixed(1)}h short` : ""}, recovery at ${ctx.recovery}%. Tonight: in bed by ${ctx.bedtime}, screens off before that. If you train today, cut volume, not the session.`;
   }
   if (has(/\b(study\w*|exam\w*|assignment\w*|class\w*|test|school|finals?)\b/)) {
     return `${o}You've got ${ctx.classCount} classes and ${ctx.openTasks} open tasks in the system. Same rules as the gym: short focused sets beat marathons. 50 minutes on, 10 off, phone in another room. Start with the assignment you're avoiding — it's the heaviest set, do it first.`;
@@ -81,7 +104,7 @@ export function coachReply(message: string, ctx: CoachContext): string {
   if (!ctx.profileComplete) {
     return `${o}I can give you sharper answers once your profile is filled in — height, weight, goal, schedule. Two minutes in Settings and I stop guessing.`;
   }
-  return `${o}Here's where you stand: ${ctx.workoutsLogged} workouts logged, ${ctx.workoutStreak}-day streak, ${ctx.openTasks} tasks open${ctx.staleMuscles.length ? `, and ${ctx.staleMuscles[0]} is overdue for work` : ""}. Ask me something specific — training, food, sleep, school — and I'll give you a straight answer.`;
+  return `${o}Here's where you stand: recovery ${ctx.recovery}%, ${ctx.workoutStreak}-day streak, ${ctx.workoutsLogged} workouts logged, ${ctx.openTasks} tasks open${ctx.staleMuscles.length ? `, and ${ctx.staleMuscles[0]} is overdue for work` : ""}. Ask me something specific — training, recovery, food, sleep, school — and I'll give you a straight answer.`;
 }
 
 export function typingDelayMs(reply: string): number {

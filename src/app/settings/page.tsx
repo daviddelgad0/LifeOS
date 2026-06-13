@@ -342,10 +342,10 @@ export default function SettingsPage() {
             {app.googleConnected ? "Connected (stub)" : "Not connected"}
           </span>
         </div>
-        <div className="flex items-center justify-between text-sm opacity-40">
+        <div className="flex items-center justify-between text-sm">
           <span>Whoop</span>
-          <span className="rounded-full border border-border px-2.5 py-1 text-xs text-text-tertiary">
-            Phase 2
+          <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-warning">
+            Simulated — OAuth in Phase 2
           </span>
         </div>
         <p className="text-xs text-text-tertiary">

@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { coachReply, typingDelayMs, type CoachContext } from "@/lib/coach-engine";
 import { dayStreak } from "@/lib/streaks";
 import { buildInsights } from "@/lib/insights";
+import {
+  energyCurve,
+  optimalGymWindow,
+  recommendedBedtime,
+} from "@/lib/energy";
+import { strainTarget, whoopToday } from "@/lib/whoop";
 import { useAppStore } from "@/stores/app-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -59,7 +65,16 @@ export default function CoachPage() {
     const profileComplete = Boolean(
       profile.name && profile.weightLb && profile.goal && profile.schedule
     );
+    const whoop = whoopToday();
     return {
+      recovery: whoop.recovery,
+      strainToday: whoop.strain,
+      strainTarget: strainTarget(whoop.recovery),
+      sleepHours: whoop.sleep.hours,
+      sleepNeeded: whoop.sleep.needed,
+      hrv: whoop.hrv,
+      gymWindow: optimalGymWindow(energyCurve(whoop)).label,
+      bedtime: recommendedBedtime(whoop),
       name: profile.name || "David",
       personality,
       workoutsLogged: done.length,
@@ -86,12 +101,13 @@ export default function CoachPage() {
 
   const chips = useMemo(() => {
     const out = [
-      `${ctx.workoutsLogged} workouts logged`,
+      `Recovery ${ctx.recovery}%`,
+      `Sleep ${ctx.sleepHours}h`,
       `${ctx.workoutStreak}-day streak`,
+      `${ctx.workoutsLogged} workouts logged`,
       `${ctx.classCount} classes`,
       `${ctx.openTasks} open tasks`,
     ];
-    if (ctx.lastWeight) out.push(`Last weight: ${ctx.lastWeight} lb`);
     if (ctx.benchTop) out.push(`Bench: ${ctx.benchTop} lb`);
     return out;
   }, [ctx]);

@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/empty-state";
 import { QuickAddTask } from "@/components/quick-add-task";
 import { Ring } from "@/components/ring";
 import { TaskRow } from "@/components/task-row";
+import { EnergyCard } from "@/components/today/energy-card";
+import { WhoopStrip } from "@/components/today/whoop-strip";
 import { addDays, formatLong, relativeDay, todayISO } from "@/lib/dates";
 import { ListChecks } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
@@ -144,6 +146,14 @@ export default function TodayPage() {
           />
         </button>
       </motion.section>
+
+      <motion.div variants={item}>
+        <WhoopStrip />
+      </motion.div>
+
+      <motion.div variants={item}>
+        <EnergyCard />
+      </motion.div>
 
       <motion.section variants={item} className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-text-tertiary">Today</h2>
