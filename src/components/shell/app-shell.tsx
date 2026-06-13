@@ -13,13 +13,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AuthGate } from "@/components/auth/auth-gate";
 import { SkeletonLoader } from "@/components/skeleton-loader";
 import { StreakBadge } from "@/components/streak-badge";
+import { SyncManager } from "@/components/shell/sync-manager";
 import { XPBar } from "@/components/xp-bar";
 import { daysBetween, todayISO } from "@/lib/dates";
 import { dayStreak } from "@/lib/streaks";
 import { ACCENTS, levelFromXP } from "@/lib/xp";
 import { useAppStore } from "@/stores/app-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useIsClient } from "@/stores/hydration";
 import { useProductivityStore } from "@/stores/productivity-store";
@@ -218,18 +221,29 @@ function LoadingSkeleton() {
   );
 }
 
+function AuthInit() {
+  const init = useAuthStore((s) => s.init);
+  useEffect(() => init(), [init]);
+  return null;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isClient = useIsClient();
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.loading);
   const focusMode = pathname.startsWith("/gym/workout");
 
-  if (!isClient) return <LoadingSkeleton />;
+  if (!isClient || authLoading) return <LoadingSkeleton />;
+  if (!user) return <><AuthInit /><AuthGate /></>;
 
   return (
     <div className="flex min-h-screen flex-col">
+      <AuthInit />
       <AccentSync />
       <PersistSeeds />
       <ReminderCheck />
+      <SyncManager />
       {!focusMode && <Sidebar pathname={pathname} />}
       <div className={cn("flex flex-1 flex-col", !focusMode && "md:pl-52")}>
         {!focusMode && <Header />}

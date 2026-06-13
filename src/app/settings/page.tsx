@@ -15,6 +15,7 @@ import { formatShort } from "@/lib/dates";
 import { ACCENTS, ACHIEVEMENTS, levelFromXP } from "@/lib/xp";
 import type { CoachPersonality, Profile } from "@/lib/types";
 import { useAppStore, type NotificationPrefs } from "@/stores/app-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -69,6 +70,8 @@ interface InstallPromptEvent extends Event {
 export default function SettingsPage() {
   const app = useAppStore();
   const { level } = levelFromXP(app.totalXP);
+  const user = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
@@ -406,9 +409,18 @@ export default function SettingsPage() {
           </Button>
         </div>
         <p className="text-xs text-text-tertiary">
-          All data lives in this browser&apos;s localStorage until Supabase
-          sync lands — export before clearing browser data.
+          Data syncs to Supabase automatically when you&apos;re signed in.
         </p>
+      </Section>
+
+      <Section title="Account">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-text-secondary">Signed in as</span>
+          <span className="font-mono text-xs text-text-secondary">{user?.email}</span>
+        </div>
+        <Button variant="outline" size="sm" className="w-full" onClick={() => signOut()}>
+          Sign out
+        </Button>
       </Section>
 
       <Section title="About">
