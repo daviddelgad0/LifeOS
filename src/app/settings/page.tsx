@@ -360,7 +360,19 @@ export default function SettingsPage() {
               </Button>
             </div>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => { window.location.href = "/api/whoop/auth"; }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const params = new URLSearchParams({
+                  client_id: process.env.NEXT_PUBLIC_WHOOP_CLIENT_ID!,
+                  redirect_uri: "https://life-os-jade-phi.vercel.app/api/whoop/callback",
+                  response_type: "code",
+                  scope: "read:recovery read:sleep read:workout read:profile read:cycles offline",
+                });
+                window.location.href = `https://api.prod.whoop.com/oauth/oauth2/auth?${params}`;
+              }}
+            >
               Connect Whoop
             </Button>
           )}
