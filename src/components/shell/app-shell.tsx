@@ -234,7 +234,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const authLoading = useAuthStore((s) => s.loading);
   const focusMode = pathname.startsWith("/gym/workout");
 
-  if (!isClient || authLoading) return <LoadingSkeleton />;
+  if (!isClient || authLoading) return <><AuthInit /><LoadingSkeleton /></>;
   if (!user) return <><AuthInit /><AuthGate /></>;
 
   return (
