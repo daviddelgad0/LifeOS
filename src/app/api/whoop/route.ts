@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { WhoopDay } from "@/lib/whoop";
 
-const API = "https://api.prod.whoop.com/developer/v1";
+const API = "https://api.prod.whoop.com/developer/v2";
 
 async function getToken(): Promise<string | null> {
   const jar = await cookies();
