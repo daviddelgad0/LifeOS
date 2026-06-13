@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   const params = new URLSearchParams({
@@ -7,5 +7,7 @@ export async function GET() {
     response_type: "code",
     scope: "read:recovery read:sleep read:workout read:profile read:cycles offline",
   });
-  redirect(`https://api.prod.whoop.com/oauth/oauth2/auth?${params}`);
+  return NextResponse.redirect(
+    `https://api.prod.whoop.com/oauth/oauth2/auth?${params}`
+  );
 }
