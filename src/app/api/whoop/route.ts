@@ -101,26 +101,33 @@ export async function GET() {
     (needed.need_from_sleep_debt_milli ?? 0) +
     (needed.need_from_recent_strain_milli ?? 0);
 
-  const startH = slp.start
-    ? new Date(slp.start).getHours() + new Date(slp.start).getMinutes() / 60
-    : 23;
-  const endH = slp.end
-    ? new Date(slp.end).getHours() + new Date(slp.end).getMinutes() / 60
-    : 7;
+  // Whoop timestamps are UTC; each record carries a timezone_offset like
+  // "-07:00". Shift the UTC time by the offset, then read the (now local) hour.
+  const localHour = (iso?: string, fallback = 0): number => {
+    if (!iso) return fallback;
+    const offset = slp.timezone_offset ?? "+00:00";
+    const sign = offset.startsWith("-") ? -1 : 1;
+    const [oh, om] = offset.slice(1).split(":").map(Number);
+    const shifted = new Date(new Date(iso).getTime() + sign * (oh * 60 + om) * 60000);
+    return shifted.getUTCHours() + shifted.getUTCMinutes() / 60;
+  };
+
+  const startH = localHour(slp.start, 23);
+  const endH = localHour(slp.end, 7);
 
   const today: WhoopDay = {
     date: new Date().toISOString().split("T")[0],
-    recovery: rec.score?.recovery_score ?? 0,
-    strain: cyc.score?.strain ?? 0,
+    recovery: Math.round(rec.score?.recovery_score ?? 0),
+    strain: Math.round((cyc.score?.strain ?? 0) * 10) / 10,
     hrv: Math.round(rec.score?.hrv_rmssd_milli ?? 0),
     rhr: rec.score?.resting_heart_rate ?? 0,
     respRate: Math.round((slp.score?.respiratory_rate ?? 14) * 10) / 10,
     calories: Math.round((cyc.score?.kilojoule ?? 0) / 4.184),
     sleep: {
-      score: slp.score?.sleep_performance_percentage ?? 0,
+      score: Math.round(slp.score?.sleep_performance_percentage ?? 0),
       hours: milli(sleptMs),
       needed: milli(neededMs),
-      efficiency: slp.score?.sleep_efficiency_percentage ?? 0,
+      efficiency: Math.round(slp.score?.sleep_efficiency_percentage ?? 0),
       deepHrs: milli(stages.total_slow_wave_sleep_time_milli ?? 0),
       remHrs: milli(stages.total_rem_sleep_time_milli ?? 0),
       lightHrs: milli(stages.total_light_sleep_time_milli ?? 0),
