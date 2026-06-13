@@ -49,11 +49,17 @@ import {
 } from "@/lib/dates";
 import { download, workoutsToCSV, workoutToText } from "@/lib/export";
 import { allExercises, getExercise } from "@/lib/exercises";
-import { estimate1RM, sessionVolume, MUSCLES } from "@/lib/fitness";
+import {
+  estimate1RM,
+  sessionVolume,
+  MUSCLES,
+  VOLUME_LANDMARKS,
+  type MuscleLandmark,
+} from "@/lib/fitness";
 import { formatNumber } from "@/lib/format";
 import { buildInsights, exerciseHistory } from "@/lib/insights";
 import { dayStreak, longestDayStreak } from "@/lib/streaks";
-import type { WorkoutSession } from "@/lib/types";
+import type { Muscle, WorkoutSession } from "@/lib/types";
 import { useAppStore } from "@/stores/app-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
@@ -155,6 +161,21 @@ export function GymProgressTab() {
     }
     return weeks;
   }, [done]);
+
+  // Sets per muscle this week — for volume landmarks
+  const weeklySetsByMuscle = useMemo(() => {
+    const weekStart = startOfWeek(todayISO());
+    const out: Partial<Record<Muscle, number>> = {};
+    for (const s of done) {
+      if (s.date < weekStart) continue;
+      for (const we of s.exercises) {
+        const m = getExercise(we.exerciseId, customExercises)?.muscle as Muscle | undefined;
+        if (!m) continue;
+        out[m] = (out[m] ?? 0) + we.sets.filter((x) => x.completed).length;
+      }
+    }
+    return out;
+  }, [done, customExercises]);
 
   // Weekly volume stacked per muscle, last 8 weeks
   const stacked = useMemo(() => {
@@ -328,6 +349,29 @@ export function GymProgressTab() {
           suffix=" lb"
           sparkline={weightSpark}
         />
+      </section>
+
+      {/* Volume Landmarks */}
+      <section className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-start justify-between">
+          <h2 className="text-sm font-medium text-text-tertiary">
+            Volume landmarks — this week
+          </h2>
+          <span className="text-[0.6rem] text-text-tertiary">MEV · MRV</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {MUSCLES.map((m) => (
+            <LandmarkBar
+              key={m}
+              muscle={m}
+              sets={weeklySetsByMuscle[m] ?? 0}
+              landmark={VOLUME_LANDMARKS[m]}
+            />
+          ))}
+        </div>
+        <p className="text-[0.6rem] text-text-tertiary">
+          MEV = min effective volume · MRV = max recoverable volume (RP Strength)
+        </p>
       </section>
 
       {insights.length > 0 && (
@@ -772,6 +816,68 @@ export function GymProgressTab() {
         onOpenChange={setLogOpen}
         onSave={(m) => logMeasurement(m)}
       />
+    </div>
+  );
+}
+
+function LandmarkBar({
+  muscle,
+  sets,
+  landmark,
+}: {
+  muscle: Muscle;
+  sets: number;
+  landmark: MuscleLandmark;
+}) {
+  const { mev, mrv } = landmark;
+  const max = Math.max(mrv, sets);
+  const fillPct = max === 0 ? 0 : Math.min(100, (sets / max) * 100);
+  const mevPct = mrv === 0 ? 0 : (mev / Math.max(mrv, sets)) * 100;
+
+  const status =
+    sets === 0 ? "none" :
+    sets < mev ? "under" :
+    sets <= mrv ? "optimal" :
+    "over";
+
+  const fillColor =
+    status === "optimal" ? "var(--accent)" :
+    status === "over"    ? "#FB7185" :
+                           "#5B8DEF";
+
+  const label =
+    status === "none"    ? "not trained" :
+    status === "under"   ? `${mev - sets} short of MEV` :
+    status === "over"    ? "above MRV — deload" :
+                           "in zone";
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="capitalize text-text-secondary">{muscle}</span>
+        <span
+          className={cn(
+            "font-mono text-[0.65rem]",
+            status === "optimal" && "text-accent",
+            status === "over" && "text-[#FB7185]",
+            (status === "none" || status === "under") && "text-text-tertiary"
+          )}
+        >
+          {sets}s · {label}
+        </span>
+      </div>
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
+          style={{ width: `${fillPct}%`, background: fillColor }}
+        />
+        {mev > 0 && (
+          <div
+            className="absolute top-0 h-full w-px bg-border-hover"
+            style={{ left: `${mevPct}%` }}
+          />
+        )}
+      </div>
     </div>
   );
 }

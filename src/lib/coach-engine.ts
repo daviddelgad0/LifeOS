@@ -22,6 +22,8 @@ export interface CoachContext {
   hrv: number;
   gymWindow: string;
   bedtime: string;
+  /** Facts the user has told the coach — persisted across sessions. */
+  memories: string[];
 }
 
 const lb = (n: number | null) => (n ? `${n} lb` : "—");
@@ -43,6 +45,12 @@ export function coachReply(message: string, ctx: CoachContext): string {
   const m = message.toLowerCase();
   const o = opener(ctx.personality, ctx.name);
   const has = (re: RegExp) => re.test(m);
+
+  if (has(/\bwhat\s+do\s+you\s+(remember|know)\b/) || has(/\bwhat\s+have\s+i\s+told\s+you\b/)) {
+    if (!ctx.memories.length)
+      return `${o}Nothing stored yet. Tell me something like "I'm cutting", "remember I have a bad shoulder", or "I'm running PPL" and I'll hold onto it.`;
+    return `${o}Here's what I've got on you: ${ctx.memories.join("; ")}.`;
+  }
 
   // Safety first — these win over everything else.
   if (has(/\b(sad|depress\w*|anxious|anxiety|struggling|hopeless|overwhelmed|panic)\b/)) {
@@ -104,7 +112,10 @@ export function coachReply(message: string, ctx: CoachContext): string {
   if (!ctx.profileComplete) {
     return `${o}I can give you sharper answers once your profile is filled in — height, weight, goal, schedule. Two minutes in Settings and I stop guessing.`;
   }
-  return `${o}Here's where you stand: recovery ${ctx.recovery}%, ${ctx.workoutStreak}-day streak, ${ctx.workoutsLogged} workouts logged, ${ctx.openTasks} tasks open${ctx.staleMuscles.length ? `, and ${ctx.staleMuscles[0]} is overdue for work` : ""}. Ask me something specific — training, recovery, food, sleep, school — and I'll give you a straight answer.`;
+  const memCtx = ctx.memories.length
+    ? ` I remember: ${ctx.memories.slice(-3).join("; ")}.`
+    : "";
+  return `${o}Here's where you stand: recovery ${ctx.recovery}%, ${ctx.workoutStreak}-day streak, ${ctx.workoutsLogged} workouts logged, ${ctx.openTasks} tasks open${ctx.staleMuscles.length ? `, and ${ctx.staleMuscles[0]} is overdue for work` : ""}.${memCtx} Ask me something specific — training, recovery, food, sleep, school — and I'll give you a straight answer.`;
 }
 
 export function typingDelayMs(reply: string): number {

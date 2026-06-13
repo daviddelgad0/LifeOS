@@ -28,6 +28,13 @@ export interface RestTimer {
   label: string;
 }
 
+export interface LastPR {
+  exerciseId: string;
+  weight: number;
+  reps: number;
+  e1rm: number;
+}
+
 interface WorkoutState {
   sessions: WorkoutSession[];
   routines: Routine[];
@@ -36,6 +43,8 @@ interface WorkoutState {
   manualGymDays: string[];
   active: WorkoutSession | null;
   restTimer: RestTimer | null;
+  /** Ephemeral — set on PR hit, cleared by PRCelebration component. Not persisted. */
+  lastPR: LastPR | null;
 
   startWorkout: (routine?: Routine) => void;
   discardWorkout: () => void;
@@ -52,6 +61,7 @@ interface WorkoutState {
   startRest: (seconds: number, label: string) => void;
   adjustRest: (deltaSeconds: number) => void;
   clearRest: () => void;
+  clearLastPR: () => void;
 
   addRoutine: (routine: Omit<Routine, "id">) => void;
   updateRoutine: (id: string, patch: Partial<Routine>) => void;
@@ -110,6 +120,7 @@ export const useWorkoutStore = create<WorkoutState>()(
       manualGymDays: [],
       active: null,
       restTimer: null,
+      lastPR: null,
 
       startWorkout: (routine) => {
         if (get().active) return;
@@ -311,16 +322,20 @@ export const useWorkoutStore = create<WorkoutState>()(
           return;
         }
         const best = bestFor(state.sessions, we.exerciseId);
+        const newE1rm = estimate1RM(target.weight, target.reps);
         const pr =
           target.weight > 0 &&
-          (target.weight > best.weight ||
-            estimate1RM(target.weight, target.reps) > best.e1rm);
+          (target.weight > best.weight || newE1rm > best.e1rm);
         state.updateSet(weId, setId, { completed: true, pr });
         state.startRest(we.restSeconds, "Rest");
-        if (pr && typeof navigator !== "undefined" && "vibrate" in navigator) {
-          navigator.vibrate([100, 50, 100]);
+        if (pr) {
+          set({ lastPR: { exerciseId: we.exerciseId, weight: target.weight, reps: target.reps, e1rm: newE1rm } });
+          if (typeof navigator !== "undefined" && "vibrate" in navigator)
+            navigator.vibrate([100, 50, 100, 50, 200]);
         }
       },
+
+      clearLastPR: () => set({ lastPR: null }),
 
       setExerciseRest: (weId, seconds) =>
         set((s) => {
@@ -393,7 +408,18 @@ export const useWorkoutStore = create<WorkoutState>()(
             : [...s.manualGymDays, date],
         })),
     }),
-    { name: "lifeos-workouts" }
+    {
+      name: "lifeos-workouts",
+      partialize: (s) => ({
+        sessions: s.sessions,
+        routines: s.routines,
+        customExercises: s.customExercises,
+        measurements: s.measurements,
+        manualGymDays: s.manualGymDays,
+        active: s.active,
+        restTimer: s.restTimer,
+      }),
+    }
   )
 );
 

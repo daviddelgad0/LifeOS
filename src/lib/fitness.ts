@@ -14,6 +14,29 @@ export const MUSCLES: Muscle[] = [
   "calves",
 ];
 
+export interface MuscleLandmark {
+  /** Minimum effective volume — sets/week below this produce little adaptation. */
+  mev: number;
+  /** Maximum recoverable volume — sets/week above this outpaces recovery. */
+  mrv: number;
+}
+
+/** RP Strength / Israetel volume landmarks, conservative beginner–intermediate range. */
+export const VOLUME_LANDMARKS: Record<Muscle, MuscleLandmark> = {
+  chest:      { mev: 8,  mrv: 22 },
+  back:       { mev: 10, mrv: 25 },
+  shoulders:  { mev: 6,  mrv: 20 },
+  biceps:     { mev: 8,  mrv: 26 },
+  triceps:    { mev: 6,  mrv: 22 },
+  forearms:   { mev: 4,  mrv: 14 },
+  core:       { mev: 0,  mrv: 16 },
+  quads:      { mev: 8,  mrv: 20 },
+  hamstrings: { mev: 6,  mrv: 20 },
+  glutes:     { mev: 0,  mrv: 16 },
+  calves:     { mev: 6,  mrv: 16 },
+  "full body": { mev: 0,  mrv: 20 },
+};
+
 /** Epley formula. */
 export function estimate1RM(weight: number, reps: number): number {
   if (reps <= 1) return weight;

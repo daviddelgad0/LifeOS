@@ -39,9 +39,11 @@ function topWeight(
 
 export default function CoachPage() {
   const messages = useChatStore((s) => s.messages);
+  const memories = useChatStore((s) => s.memories);
   const typing = useChatStore((s) => s.typing);
   const sendUser = useChatStore((s) => s.sendUser);
   const receiveCoach = useChatStore((s) => s.receiveCoach);
+  const forgetFact = useChatStore((s) => s.forgetFact);
 
   const profile = useAppStore((s) => s.profile);
   const personality = useAppStore((s) => s.personality);
@@ -75,6 +77,7 @@ export default function CoachPage() {
       hrv: whoop.hrv,
       gymWindow: optimalGymWindow(energyCurve(whoop)).label,
       bedtime: recommendedBedtime(whoop),
+      memories,
       name: profile.name || "David",
       personality,
       workoutsLogged: done.length,
@@ -97,6 +100,7 @@ export default function CoachPage() {
     classes,
     profile,
     personality,
+    memories,
   ]);
 
   const chips = useMemo(() => {
@@ -162,6 +166,27 @@ export default function CoachPage() {
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border py-3">
+        {memories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+            <span className="text-[0.6rem] text-text-tertiary">remembered</span>
+            {memories.map((m) => (
+              <span
+                key={m}
+                className="flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[0.65rem] text-text-secondary"
+              >
+                {m}
+                <button
+                  type="button"
+                  onClick={() => forgetFact(m)}
+                  aria-label={`Forget: ${m}`}
+                  className="ml-0.5 text-text-tertiary hover:text-text-primary"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {chips.map((chip) => (
             <button

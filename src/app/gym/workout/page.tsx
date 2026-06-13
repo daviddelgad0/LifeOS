@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowUp,
@@ -19,6 +19,7 @@ import {
 
 import { EmptyState } from "@/components/empty-state";
 import { ExercisePicker } from "@/components/exercise-picker";
+import { PRCelebration } from "@/components/gym/pr-celebration";
 import { RestTimerBar } from "@/components/gym/rest-timer-bar";
 import {
   SetEditorSheet,
@@ -202,6 +203,8 @@ export default function ActiveWorkoutPage() {
   const setExerciseRest = useWorkoutStore((s) => s.setExerciseRest);
   const finishWorkout = useWorkoutStore((s) => s.finishWorkout);
   const discardWorkout = useWorkoutStore((s) => s.discardWorkout);
+  const lastPR = useWorkoutStore((s) => s.lastPR);
+  const clearLastPR = useWorkoutStore((s) => s.clearLastPR);
 
   const [editor, setEditor] = useState<SetEditorTarget | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -574,6 +577,20 @@ export default function ActiveWorkoutPage() {
           Back to gym
         </Link>
       </div>
+
+      <AnimatePresence>
+        {lastPR && (
+          <PRCelebration
+            key="pr-celebration"
+            exerciseName={
+              getExercise(lastPR.exerciseId, customExercises)?.name ?? null
+            }
+            weight={lastPR.weight}
+            reps={lastPR.reps}
+            onDismiss={clearLastPR}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
