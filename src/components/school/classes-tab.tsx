@@ -25,7 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/empty-state";
 import { SkeletonLoader } from "@/components/skeleton-loader";
 import { TaskRow } from "@/components/task-row";
-import { addDays, formatShort, todayISO } from "@/lib/dates";
+import { formatShort } from "@/lib/dates";
 import type {
   AssignmentType,
   ClassMeeting,
@@ -48,29 +48,6 @@ const CLASS_COLORS = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Deterministic mock parser — Phase 4 swaps this for /api/parse-syllabus. */
-function mockParseSyllabus(filename: string): ParsedSyllabusItem[] {
-  const seedNum = [...filename].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const base = todayISO();
-  const item = (
-    offsetDays: number,
-    title: string,
-    type: AssignmentType
-  ): ParsedSyllabusItem => ({
-    title,
-    type,
-    due: addDays(base, offsetDays + (seedNum % 3)),
-    include: true,
-  });
-  return [
-    item(4, "Reading response 4", "reading"),
-    item(7, "Problem set 9", "problem set"),
-    item(11, "Quiz 5", "quiz"),
-    item(16, "Project milestone 2", "project"),
-    item(23, "Midterm exam", "exam"),
-    item(31, "Final paper draft", "paper"),
-  ];
-}
 
 export function ClassesTab() {
   const classes = useTaskStore((s) => s.classes);
@@ -94,7 +71,7 @@ export function ClassesTab() {
     [classes, detail]
   );
 
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (classes.length === 0) {
       toast("Add a class first", {
@@ -104,11 +81,23 @@ export function ClassesTab() {
     }
     setParsing(true);
     setReviewClassId(classes[0].id);
-    // Simulated parse latency so the skeleton state is honest about async.
-    setTimeout(() => {
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/parse-syllabus", { method: "POST", body: form });
+      if (!res.ok) throw new Error("api_error");
+      const items = await res.json();
+      if (!Array.isArray(items) || items.length === 0) {
+        toast("Nothing found", { description: "Claude couldn't find any dated assignments. Try a clearer PDF or image." });
+        setParsing(false);
+        return;
+      }
+      setReview(items);
+    } catch {
+      toast("Parse failed", { description: "Couldn't read the syllabus. Try again or add assignments manually." });
+    } finally {
       setParsing(false);
-      setReview(mockParseSyllabus(file.name));
-    }, 1600);
+    }
   };
 
   return (
