@@ -40,6 +40,7 @@ const SLEEP_COLORS = {
 export function GymRecoveryTab() {
   const today = useWhoopToday();
   const days = useWhoopDays();
+  const connected = useWhoopStore((s) => s.connected);
   const color = READINESS_COLOR[readiness(today.recovery)];
 
   const trend = useMemo(
@@ -72,8 +73,9 @@ export function GymRecoveryTab() {
   return (
     <div className="flex flex-col gap-8">
       <p className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-text-tertiary">
-        Simulated Whoop feed — realistic numbers wired through the whole app.
-        Phase 2 swaps in your real band via OAuth without changing anything here.
+        {connected
+          ? "Live from your Whoop — today's recovery, strain, and sleep are real. The trend charts below stay simulated until enough live days build up."
+          : "Simulated Whoop feed — connect your band in Settings to pull live data."}
       </p>
 
       {/* Big three */}
