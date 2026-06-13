@@ -6,7 +6,7 @@ import { Send } from "lucide-react";
 
 import { ChatMessage } from "@/components/chat-message";
 import { Button } from "@/components/ui/button";
-import { coachReply, typingDelayMs, type CoachContext } from "@/lib/coach-engine";
+import { coachReply, type CoachContext } from "@/lib/coach-engine";
 import { dayStreak } from "@/lib/streaks";
 import { buildInsights } from "@/lib/insights";
 import {
@@ -124,13 +124,36 @@ export default function CoachPage() {
     });
   }, [messages.length, typing]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || typing) return;
     sendUser(trimmed);
     setInput("");
-    const reply = coachReply(trimmed, ctx);
-    setTimeout(() => receiveCoach(reply), typingDelayMs(reply));
+
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          ctx,
+          history: messages.slice(-10).map((m) => ({ role: m.role, text: m.text })),
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error("api_error");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let reply = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        reply += decoder.decode(value, { stream: true });
+      }
+      receiveCoach(reply.trim());
+    } catch {
+      // Fallback to mock engine if API is unavailable
+      receiveCoach(coachReply(trimmed, ctx));
+    }
   };
 
   return (
