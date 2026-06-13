@@ -123,8 +123,8 @@ function Header() {
   const streak = dayStreak(gymDayDates(sessions, manual));
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 md:px-6">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-4 px-4 md:px-6">
         <Link href="/" className="font-display text-base font-semibold tracking-display transition-colors hover:text-accent">
           LifeOS
         </Link>
@@ -184,8 +184,8 @@ function Sidebar({ pathname }: { pathname: string }) {
 
 function BottomBar({ pathname }: { pathname: string }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur-md md:hidden">
-      <div className="grid h-16 grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+      <div className="grid h-16 grid-cols-5">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -209,7 +209,7 @@ function BottomBar({ pathname }: { pathname: string }) {
 
 function LoadingSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-8 md:px-6">
       <SkeletonLoader className="h-8 w-56" />
       <div className="grid gap-4 sm:grid-cols-3">
         <SkeletonLoader className="h-32" />
@@ -247,7 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!focusMode && <Sidebar pathname={pathname} />}
       <div className={cn("flex flex-1 flex-col", !focusMode && "md:pl-52")}>
         {!focusMode && <Header />}
-        <main className={cn("flex flex-1 flex-col", !focusMode && "pb-20 md:pb-8")}>
+        <main className={cn("flex flex-1 flex-col", !focusMode && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-8")}>
           {children}
         </main>
       </div>
