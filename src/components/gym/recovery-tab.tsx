@@ -27,7 +27,7 @@ import {
   strainTarget,
   whoopInsights,
 } from "@/lib/whoop";
-import { useWhoopDays, useWhoopToday } from "@/stores/whoop-store";
+import { useWhoopDays, useWhoopStore, useWhoopToday } from "@/stores/whoop-store";
 import { cn } from "@/lib/utils";
 
 const SLEEP_COLORS = {
