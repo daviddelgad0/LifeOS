@@ -11,7 +11,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { plateBreakdown, warmupSets } from "@/lib/fitness";
+import { barWeight, plateBreakdown, warmupSets } from "@/lib/fitness";
+import { toDisplayWeight, toStoredWeight, weightStep } from "@/lib/units";
+import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
 export interface SetEditorTarget {
@@ -43,15 +45,17 @@ const FIELD_LABEL = {
 } as const;
 
 export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProps) {
+  const units = useAppStore((s) => s.units);
   const [value, setValue] = useState(0);
   const [note, setNote] = useState("");
   const [showWarmup, setShowWarmup] = useState(false);
-  // Sync local state when a new target opens (render-time adjustment).
+  // Sync local state when a new target opens (render-time adjustment). Weight
+  // is stored in lb but edited in the user's display unit.
   const [lastKey, setLastKey] = useState("");
   const key = target ? `${target.setId}-${target.field}` : "";
   if (target && key !== lastKey) {
     setLastKey(key);
-    setValue(target.value);
+    setValue(target.field === "weight" ? toDisplayWeight(target.value, units) : target.value);
     setNote(target.note ?? "");
     setShowWarmup(false);
   }
@@ -60,12 +64,13 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
 
   const plates =
     target.field === "weight" && target.isBarbell
-      ? plateBreakdown(value)
+      ? plateBreakdown(value, units)
       : null;
 
   const commit = () => {
     if (target.field === "note") onCommit({ note: note.trim() || undefined });
     else if (target.field === "rir") onCommit({ rir: value });
+    else if (target.field === "weight") onCommit({ weight: toStoredWeight(value, units) });
     else onCommit({ [target.field]: value });
     onClose();
   };
@@ -109,10 +114,10 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
             <NumberInput
               value={value}
               onChange={setValue}
-              step={target.field === "weight" ? 5 : 1}
+              step={target.field === "weight" ? weightStep(units) : 1}
               min={0}
               max={target.field === "weight" ? 1500 : 100}
-              unit={target.field === "weight" ? "lb" : "reps"}
+              unit={target.field === "weight" ? units : "reps"}
               aria-label={FIELD_LABEL[target.field]}
             />
           )}
@@ -122,7 +127,7 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
               {plates && (
                 <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2">
                   <span className="text-xs text-text-tertiary">
-                    Per side (45 lb bar):
+                    Per side ({barWeight(units)} {units} bar):
                   </span>
                   {plates.length === 0 ? (
                     <span className="font-mono text-xs">empty bar</span>
@@ -140,7 +145,7 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
               )}
               {target.isBarbell && plates === null && value > 0 && (
                 <p className="text-xs text-warning">
-                  {value} lb can&apos;t be loaded exactly with standard plates.
+                  {value} {units} can&apos;t be loaded exactly with standard plates.
                 </p>
               )}
               <button
@@ -152,9 +157,9 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
               </button>
               {showWarmup && (
                 <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-3 py-2">
-                  {warmupSets(value).map((w, i) => (
+                  {warmupSets(value, units).map((w, i) => (
                     <span key={i} className="font-mono text-xs text-text-secondary">
-                      {w.weight} lb × {w.reps}
+                      {w.weight} {units} × {w.reps}
                     </span>
                   ))}
                 </div>

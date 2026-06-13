@@ -61,6 +61,7 @@ import { buildInsights, exerciseHistory } from "@/lib/insights";
 import { dayStreak, longestDayStreak } from "@/lib/streaks";
 import type { Muscle, WorkoutSession } from "@/lib/types";
 import { useAppStore } from "@/stores/app-store";
+import { toDisplayTotal, toDisplayWeight, toStoredWeight } from "@/lib/units";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -103,6 +104,10 @@ export function GymProgressTab() {
   const measurements = useWorkoutStore((s) => s.measurements);
   const logMeasurement = useWorkoutStore((s) => s.logMeasurement);
   const goalWeight = useAppStore((s) => s.goalWeightLb);
+  const units = useAppStore((s) => s.units);
+  // Charts/tables keep their math in lb; convert only at the display edge.
+  const wDisp = (lb: number) => toDisplayWeight(lb, units);
+  const wTotal = (lb: number) => toDisplayTotal(lb, units);
 
   const done = useMemo(
     () =>
@@ -290,7 +295,14 @@ export function GymProgressTab() {
   const measureSeries = useMemo(() => {
     const pts = measurements
       .filter((m) => m[measureMetric] !== undefined)
-      .map((m) => ({ date: formatShort(m.date), value: m[measureMetric]! }));
+      .map((m) => ({
+        date: formatShort(m.date),
+        // Body weight is stored in lb; other measures are %/inches (unitless here).
+        value:
+          measureMetric === "weight"
+            ? toDisplayWeight(m.weight!, units)
+            : m[measureMetric]!,
+      }));
     if (!smooth || pts.length < 7) return pts;
     return pts.map((p, i) => {
       const window = pts.slice(Math.max(0, i - 6), i + 1);
@@ -302,7 +314,7 @@ export function GymProgressTab() {
           ) / 10,
       };
     });
-  }, [measurements, measureMetric, smooth]);
+  }, [measurements, measureMetric, smooth, units]);
 
   const insights = useMemo(
     () => buildInsights(done, customExercises),
@@ -345,9 +357,9 @@ export function GymProgressTab() {
         <StatCard label="Last 30 days" value={workoutsThisMonth} suffix=" workouts" />
         <StatCard
           label="Body weight"
-          value={Math.round(latestWeight)}
-          suffix=" lb"
-          sparkline={weightSpark}
+          value={wDisp(latestWeight)}
+          suffix={` ${units}`}
+          sparkline={weightSpark.map(wDisp)}
         />
       </section>
 
@@ -406,11 +418,11 @@ export function GymProgressTab() {
           {(w, h) => (
             <BarChart width={w} height={h} data={weeklyVolume}>
               <XAxis dataKey="week" {...AXIS} />
-              <YAxis {...AXIS} width={42} tickFormatter={(v: number) => formatNumber(v)} />
+              <YAxis {...AXIS} width={42} tickFormatter={(v: number) => formatNumber(wTotal(v))} />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                formatter={(v) => [`${formatNumber(Number(v))} lb`, "volume"]}
+                formatter={(v) => [`${formatNumber(wTotal(Number(v)))} ${units}`, "volume"]}
               />
               <Bar dataKey="volume" fill="var(--accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -483,11 +495,22 @@ export function GymProgressTab() {
             {(w, h) => (
               <LineChart width={w} height={h} data={progression}>
                 <XAxis dataKey="date" {...AXIS} />
-                <YAxis {...AXIS} width={42} domain={["auto", "auto"]} />
+                <YAxis
+                  {...AXIS}
+                  width={42}
+                  domain={["auto", "auto"]}
+                  tickFormatter={(v: number) =>
+                    metric === "reps"
+                      ? formatNumber(v)
+                      : formatNumber(metric === "volume" ? wTotal(v) : wDisp(v))
+                  }
+                />
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [
-                    `${formatNumber(Number(v))}${metric === "reps" ? " reps" : " lb"}`,
+                    metric === "reps"
+                      ? `${formatNumber(Number(v))} reps`
+                      : `${formatNumber(metric === "volume" ? wTotal(Number(v)) : wDisp(Number(v)))} ${units}`,
                     METRICS.find((m) => m.id === metric)!.label,
                   ]}
                 />
@@ -537,10 +560,10 @@ export function GymProgressTab() {
             >
               <span className="truncate">{row.name}</span>
               <span className="text-right font-mono text-xs">
-                {row.weight}×{row.reps}
+                {wDisp(row.weight)}×{row.reps}
               </span>
               <span className="text-right font-mono text-xs text-accent">
-                {estimate1RM(row.weight, row.reps)}
+                {wDisp(estimate1RM(row.weight, row.reps))}
               </span>
               <span className="text-right font-mono text-[0.65rem] text-text-tertiary">
                 {formatShort(row.date)}
@@ -551,7 +574,7 @@ export function GymProgressTab() {
         {recentPRs.length > 0 && (
           <p className="text-xs text-text-tertiary">
             {recentPRs.length} PR{recentPRs.length > 1 ? "s" : ""} in the last 30
-            days — latest: {recentPRs[0].exercise} {recentPRs[0].weight}×
+            days — latest: {recentPRs[0].exercise} {wDisp(recentPRs[0].weight)}×
             {recentPRs[0].reps}
           </p>
         )}
@@ -566,11 +589,11 @@ export function GymProgressTab() {
           {(w, h) => (
             <BarChart width={w} height={h} data={stacked}>
               <XAxis dataKey="week" {...AXIS} />
-              <YAxis {...AXIS} width={42} tickFormatter={(v: number) => formatNumber(v)} />
+              <YAxis {...AXIS} width={42} tickFormatter={(v: number) => formatNumber(wTotal(v))} />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                formatter={(v, name) => [`${formatNumber(Number(v))} lb`, name]}
+                formatter={(v, name) => [`${formatNumber(wTotal(Number(v)))} ${units}`, name]}
               />
               {MUSCLES.map((m, i) => (
                 <Bar
@@ -609,7 +632,7 @@ export function GymProgressTab() {
             return (
               <div
                 key={date}
-                title={`${formatShort(date)} — ${formatNumber(vol)} lb`}
+                title={`${formatShort(date)} — ${formatNumber(wTotal(vol))} ${units}`}
                 className="size-4 rounded-sm border border-border"
                 style={{
                   background:
@@ -695,11 +718,11 @@ export function GymProgressTab() {
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
                 {measureMetric === "weight" && (
                   <ReferenceLine
-                    y={goalWeight}
+                    y={wDisp(goalWeight)}
                     stroke="rgba(255,255,255,0.25)"
                     strokeDasharray="4 4"
                     label={{
-                      value: `goal ${goalWeight}`,
+                      value: `goal ${wDisp(goalWeight)}`,
                       fill: "#666666",
                       fontSize: 10,
                       position: "insideTopRight",
@@ -771,10 +794,10 @@ export function GymProgressTab() {
               <span className="text-xs text-text-tertiary">LifeOS · PR</span>
               <span className="text-sm text-text-secondary">{prCard.name}</span>
               <span className="font-mono text-5xl font-medium text-accent">
-                {prCard.weight}
+                {wDisp(prCard.weight)}
               </span>
               <span className="font-mono text-sm text-text-secondary">
-                lb × {prCard.reps} · e1RM {estimate1RM(prCard.weight, prCard.reps)}
+                {units} × {prCard.reps} · e1RM {wDisp(estimate1RM(prCard.weight, prCard.reps))}
               </span>
               <span className="text-xs text-text-tertiary">
                 {formatShort(prCard.date)}
@@ -899,6 +922,7 @@ function MeasurementDialog({
     thighs?: number;
   }) => void;
 }) {
+  const units = useAppStore((s) => s.units);
   const [form, setForm] = useState({
     weight: "",
     bodyFat: "",
@@ -909,7 +933,7 @@ function MeasurementDialog({
   });
 
   const fields = [
-    ["weight", "Weight (lb)"],
+    ["weight", `Weight (${units})`],
     ["bodyFat", "Body fat %"],
     ["chest", "Chest (in)"],
     ["arms", "Arms (in)"],
@@ -919,9 +943,11 @@ function MeasurementDialog({
 
   const save = () => {
     const num = (v: string) => (v.trim() === "" ? undefined : parseFloat(v));
+    // Body weight is entered in the display unit but stored in lb.
+    const w = num(form.weight);
     onSave({
       date: todayISO(),
-      weight: num(form.weight),
+      weight: w === undefined ? undefined : toStoredWeight(w, units),
       bodyFat: num(form.bodyFat),
       chest: num(form.chest),
       arms: num(form.arms),

@@ -50,6 +50,8 @@ import {
 } from "@/lib/fitness";
 import type { Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
 import { previousSets, useWorkoutStore } from "@/stores/workout-store";
+import { useAppStore } from "@/stores/app-store";
+import { toDisplayWeight, toDisplayTotal } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
 function useTick(intervalMs: number) {
@@ -112,6 +114,8 @@ function SetRow({
   const toggleSetComplete = useWorkoutStore((s) => s.toggleSetComplete);
   const deleteSet = useWorkoutStore((s) => s.deleteSet);
   const updateSet = useWorkoutStore((s) => s.updateSet);
+  const units = useAppStore((s) => s.units);
+  const wDisp = (lb: number) => toDisplayWeight(lb, units);
 
   const open = (field: SetEditorTarget["field"]) =>
     onEdit({
@@ -151,16 +155,16 @@ function SetRow({
           prev && updateSet(we.id, set.id, { weight: prev.weight, reps: prev.reps })
         }
         disabled={!prev}
-        aria-label={prev ? `Copy previous ${prev.weight} by ${prev.reps}` : "No previous data"}
+        aria-label={prev ? `Copy previous ${wDisp(prev.weight)} by ${prev.reps}` : "No previous data"}
         className={cn(
           "h-11 truncate rounded-lg text-center font-mono text-xs leading-[2.75rem] text-text-tertiary transition-colors",
           prev ? "hover:bg-muted hover:text-text-secondary" : "cursor-default"
         )}
       >
-        {prev ? `${prev.weight}×${prev.reps}` : "—"}
+        {prev ? `${wDisp(prev.weight)}×${prev.reps}` : "—"}
       </button>
       <button type="button" onClick={() => open("weight")} className={chip}>
-        {set.weight || "—"}
+        {set.weight ? wDisp(set.weight) : "—"}
       </button>
       <button type="button" onClick={() => open("reps")} className={chip}>
         {set.reps || "—"}
@@ -205,6 +209,7 @@ export default function ActiveWorkoutPage() {
   const discardWorkout = useWorkoutStore((s) => s.discardWorkout);
   const lastPR = useWorkoutStore((s) => s.lastPR);
   const clearLastPR = useWorkoutStore((s) => s.clearLastPR);
+  const units = useAppStore((s) => s.units);
 
   const [editor, setEditor] = useState<SetEditorTarget | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -226,7 +231,8 @@ export default function ActiveWorkoutPage() {
   }, [active, sessions]);
 
   const volume = active ? sessionVolume(active) : 0;
-  const animatedVolume = useCountUp(volume);
+  const volumeDisplay = toDisplayTotal(volume, units);
+  const animatedVolume = useCountUp(volumeDisplay);
 
   if (!active) {
     return (
@@ -341,7 +347,7 @@ export default function ActiveWorkoutPage() {
                 <div className="flex shrink-0 items-center gap-1">
                   {topSet.weight > 0 && (
                     <span className="mr-1 font-mono text-[0.65rem] text-text-tertiary">
-                      e1RM {estimate1RM(topSet.weight, topSet.reps)}
+                      e1RM {toDisplayWeight(estimate1RM(topSet.weight, topSet.reps), units)}
                     </span>
                   )}
                   <span className="flex items-center gap-1 font-mono text-[0.65rem] text-text-tertiary">
@@ -389,7 +395,7 @@ export default function ActiveWorkoutPage() {
               <div className="grid grid-cols-[1.5rem_3.5rem_1fr_1fr_2.75rem_2.75rem] gap-2 text-center text-[0.65rem] text-text-tertiary">
                 <span>set</span>
                 <span>prev</span>
-                <span>lb</span>
+                <span>{units}</span>
                 <span>reps</span>
                 <span>RIR</span>
                 <span />
@@ -487,7 +493,7 @@ export default function ActiveWorkoutPage() {
             <div className="rounded-lg border border-border bg-surface-raised p-3">
               <p className="text-xs text-text-tertiary">Volume</p>
               <p className="font-mono text-xl font-medium">
-                {formatNumber(volume)} lb
+                {formatNumber(volumeDisplay)} {units}
               </p>
             </div>
             <div className="rounded-lg border border-border bg-surface-raised p-3">

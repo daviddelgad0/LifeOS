@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { estimate1RM } from "@/lib/fitness";
+import { toDisplayWeight } from "@/lib/units";
+import { useAppStore } from "@/stores/app-store";
 import { XP } from "@/lib/xp";
 
 const COLORS = [
@@ -67,7 +69,9 @@ export function PRCelebration({
   reps: number;
   onDismiss: () => void;
 }) {
-  const e1rm = estimate1RM(weight, reps);
+  const units = useAppStore((s) => s.units);
+  const e1rm = toDisplayWeight(estimate1RM(weight, reps), units);
+  const weightDisp = toDisplayWeight(weight, units);
 
   return (
     <motion.div
@@ -106,11 +110,11 @@ export function PRCelebration({
           transition={{ type: "spring", delay: 0.2, bounce: 0.5 }}
           className="font-mono text-7xl font-bold text-accent"
         >
-          {weight}
+          {weightDisp}
         </motion.p>
 
         <p className="font-mono text-base text-text-secondary">
-          lb &times; {reps} &nbsp;·&nbsp; e1RM {e1rm}
+          {units} &times; {reps} &nbsp;·&nbsp; e1RM {e1rm}
         </p>
 
         <motion.p
