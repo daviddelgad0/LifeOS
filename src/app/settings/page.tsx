@@ -360,8 +360,8 @@ export default function SettingsPage() {
               </Button>
             </div>
           ) : (
-            <Button variant="outline" size="sm" asChild>
-              <a href="/api/whoop/auth">Connect Whoop</a>
+            <Button variant="outline" size="sm" onClick={() => { window.location.href = "/api/whoop/auth"; }}>
+              Connect Whoop
             </Button>
           )}
         </div>
