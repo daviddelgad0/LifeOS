@@ -79,6 +79,18 @@ export default function SettingsPage() {
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [whoopDebug, setWhoopDebug] = useState<string | null>(null);
+
+  const testWhoop = async () => {
+    setWhoopDebug("Testing…");
+    try {
+      const res = await fetch("/api/whoop", { cache: "no-store" });
+      const data = await res.json();
+      setWhoopDebug(JSON.stringify(data, null, 2));
+    } catch (e) {
+      setWhoopDebug(`Fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -392,6 +404,16 @@ export default function SettingsPage() {
             >
               Connect Whoop
             </Button>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button variant="outline" size="sm" onClick={testWhoop} className="self-start">
+            Test Whoop connection
+          </Button>
+          {whoopDebug && (
+            <pre className="overflow-x-auto rounded-lg border border-border bg-surface-raised p-3 text-[0.65rem] text-text-secondary">
+              {whoopDebug}
+            </pre>
           )}
         </div>
         <p className="text-xs text-text-tertiary">

@@ -36,8 +36,17 @@ async function getToken(): Promise<string | null> {
 }
 
 export async function GET() {
+  const jar = await cookies();
+  const hadAccess = !!jar.get("whoop_access")?.value;
+  const hadRefresh = !!jar.get("whoop_refresh")?.value;
+
   const token = await getToken();
-  if (!token) return NextResponse.json({ connected: false });
+  if (!token) {
+    return NextResponse.json({
+      connected: false,
+      debug: { stage: "no_token", hadAccess, hadRefresh },
+    });
+  }
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -48,7 +57,17 @@ export async function GET() {
   ]);
 
   if (!cycleRes.ok || !recoveryRes.ok || !sleepRes.ok) {
-    return NextResponse.json({ connected: false });
+    const body = await cycleRes.text().catch(() => "");
+    return NextResponse.json({
+      connected: false,
+      debug: {
+        stage: "api_error",
+        cycle: cycleRes.status,
+        recovery: recoveryRes.status,
+        sleep: sleepRes.status,
+        sample: body.slice(0, 120),
+      },
+    });
   }
 
   const [cycle, recovery, sleep] = await Promise.all([
@@ -61,7 +80,17 @@ export async function GET() {
   const rec = recovery.records?.[0];
   const slp = sleep.records?.[0];
 
-  if (!cyc || !rec || !slp) return NextResponse.json({ connected: false });
+  if (!cyc || !rec || !slp) {
+    return NextResponse.json({
+      connected: false,
+      debug: {
+        stage: "no_records",
+        cycles: cycle.records?.length ?? 0,
+        recoveries: recovery.records?.length ?? 0,
+        sleeps: sleep.records?.length ?? 0,
+      },
+    });
+  }
 
   const milli = (ms: number) => Math.round((ms / 3_600_000) * 10) / 10;
   const stages = slp.score?.stage_summary ?? {};
