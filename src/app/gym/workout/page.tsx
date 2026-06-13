@@ -263,7 +263,7 @@ export default function ActiveWorkoutPage() {
 
   return (
     <div className="flex min-h-screen flex-col pb-40">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
