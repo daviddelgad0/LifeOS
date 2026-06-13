@@ -21,13 +21,14 @@ export const useWhoopStore = create<WhoopState>((set) => ({
       // freshly connected band and the tab would keep showing simulated data.
       const res = await fetch("/api/whoop", { cache: "no-store" });
       if (!res.ok) return;
-      const data: { connected: boolean; today?: WhoopDay } = await res.json();
-      if (!data.connected || !data.today) return;
-      set((s) => ({
-        days: [...s.days.slice(0, -1), data.today!],
+      const data: { connected: boolean; days?: WhoopDay[] } = await res.json();
+      if (!data.connected || !data.days?.length) return;
+      // Replace the simulated history wholesale with the real band history.
+      set({
+        days: data.days,
         connected: true,
         lastSync: new Date().toISOString(),
-      }));
+      });
     } catch {}
   },
 
