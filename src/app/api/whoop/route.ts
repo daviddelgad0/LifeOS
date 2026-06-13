@@ -18,8 +18,8 @@ async function getToken(): Promise<string | null> {
     body: new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refresh,
-      client_id: process.env.WHOOP_CLIENT_ID!,
-      client_secret: process.env.WHOOP_CLIENT_SECRET!,
+      client_id: "55b30dd5-3520-404b-82e8-be484d13e46a",
+      client_secret: process.env.WHOOP_CLIENT_SECRET ?? "",
     }),
   });
   if (!res.ok) return null;

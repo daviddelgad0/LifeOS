@@ -75,6 +75,7 @@ export default function SettingsPage() {
   const signOut = useAuthStore((s) => s.signOut);
   const whoopConnected = useWhoopStore((s) => s.connected);
   const whoopDisconnect = useWhoopStore((s) => s.disconnect);
+  const whoopInit = useWhoopStore((s) => s.init);
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
@@ -87,6 +88,20 @@ export default function SettingsPage() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  // Surface the OAuth result after the Whoop callback redirects back here.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("whoop");
+    if (!status) return;
+    if (status === "connected") {
+      toast.success("Whoop connected — pulling your data…");
+      whoopInit();
+    } else {
+      toast.error(`Whoop failed: ${params.get("reason") ?? "unknown"}`);
+    }
+    window.history.replaceState({}, "", "/settings");
+  }, [whoopInit]);
 
   const estCost = Math.round(app.coachMessagesSent * 1.2) / 100;
   const budgetPct = Math.min(100, (estCost / Math.max(0.01, app.monthlyBudget)) * 100);
