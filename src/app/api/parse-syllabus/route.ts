@@ -24,28 +24,24 @@ export async function POST(req: NextRequest) {
   const base64 = Buffer.from(bytes).toString("base64");
   const today = new Date().toISOString().split("T")[0];
   const isPdf = file.type === "application/pdf";
-  const mediaType = isPdf
-    ? ("application/pdf" as const)
-    : (file.type as "image/jpeg" | "image/png" | "image/webp" | "image/gif");
-
-  const fileBlock = isPdf
-    ? ({ type: "document", source: { type: "base64", media_type: mediaType, data: base64 } } as const)
-    : ({ type: "image", source: { type: "base64", media_type: mediaType, data: base64 } } as const);
+  const prompt = { type: "text" as const, text: `Today is ${today}. Parse the syllabus above.` };
 
   try {
+    const content = isPdf
+      ? [
+          { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } },
+          prompt,
+        ]
+      : [
+          { type: "image" as const, source: { type: "base64" as const, media_type: file.type as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: base64 } },
+          prompt,
+        ];
+
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: [
-            fileBlock,
-            { type: "text", text: `Today is ${today}. Parse the syllabus above.` },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
     });
 
     const raw = response.content[0]?.type === "text" ? response.content[0].text.trim() : "[]";
