@@ -4,6 +4,9 @@ import type { WhoopDay } from "@/lib/whoop";
 
 const API = "https://api.prod.whoop.com/developer/v2";
 
+// Always run fresh — this reads auth cookies and must never be cached.
+export const dynamic = "force-dynamic";
+
 async function getToken(): Promise<string | null> {
   const jar = await cookies();
   const access = jar.get("whoop_access")?.value;

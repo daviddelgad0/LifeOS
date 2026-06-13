@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, Lock } from "lucide-react";
+import { Check, Clock, Download, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { ACCENTS, ACHIEVEMENTS, levelFromXP } from "@/lib/xp";
 import type { CoachPersonality, Profile } from "@/lib/types";
 import { useAppStore, type NotificationPrefs } from "@/stores/app-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { useWhoopStore } from "@/stores/whoop-store";
+import { syncLabel, useWhoopStore } from "@/stores/whoop-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -76,6 +76,7 @@ export default function SettingsPage() {
   const whoopConnected = useWhoopStore((s) => s.connected);
   const whoopDisconnect = useWhoopStore((s) => s.disconnect);
   const whoopInit = useWhoopStore((s) => s.init);
+  const whoopLastSync = useWhoopStore((s) => s.lastSync);
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
@@ -367,6 +368,12 @@ export default function SettingsPage() {
           <span>Whoop</span>
           {whoopConnected ? (
             <div className="flex items-center gap-2">
+              {whoopLastSync && (
+                <span className="flex items-center gap-1 text-xs text-text-tertiary">
+                  <Clock className="size-3" />
+                  {syncLabel(whoopLastSync)}
+                </span>
+              )}
               <span className="rounded-full border border-accent-border bg-accent-dim px-2.5 py-1 text-xs text-accent">
                 Connected
               </span>

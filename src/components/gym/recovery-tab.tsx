@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, HeartPulse, Lightbulb, Moon, Wind } from "lucide-react";
+import { Activity, Clock, HeartPulse, Lightbulb, Moon, Wind } from "lucide-react";
 
 import { Ring } from "@/components/ring";
 import { StatCard } from "@/components/stat-card";
@@ -27,7 +27,7 @@ import {
   strainTarget,
   whoopInsights,
 } from "@/lib/whoop";
-import { useWhoopDays, useWhoopStore, useWhoopToday } from "@/stores/whoop-store";
+import { syncLabel, useWhoopDays, useWhoopStore, useWhoopToday } from "@/stores/whoop-store";
 import { cn } from "@/lib/utils";
 
 const SLEEP_COLORS = {
@@ -41,6 +41,7 @@ export function GymRecoveryTab() {
   const today = useWhoopToday();
   const days = useWhoopDays();
   const connected = useWhoopStore((s) => s.connected);
+  const lastSync = useWhoopStore((s) => s.lastSync);
   const color = READINESS_COLOR[readiness(today.recovery)];
 
   const trend = useMemo(
@@ -72,11 +73,19 @@ export function GymRecoveryTab() {
 
   return (
     <div className="flex flex-col gap-8">
-      <p className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-text-tertiary">
-        {connected
-          ? "Live from your Whoop — today's recovery, strain, and sleep are real. The trend charts below stay simulated until enough live days build up."
-          : "Simulated Whoop feed — connect your band in Settings to pull live data."}
-      </p>
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-text-tertiary">
+        <p>
+          {connected
+            ? "Live from your Whoop — today's recovery, strain, and sleep are real. The trend charts below stay simulated until enough live days build up."
+            : "Simulated Whoop feed — connect your band in Settings to pull live data."}
+        </p>
+        {connected && lastSync && (
+          <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-accent">
+            <Clock className="size-3" />
+            {syncLabel(lastSync)}
+          </span>
+        )}
+      </div>
 
       {/* Big three */}
       <section className="flex items-center justify-around gap-2 rounded-xl border border-border bg-surface px-2 py-6 sm:justify-start sm:gap-12 sm:px-8">
