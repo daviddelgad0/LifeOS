@@ -364,11 +364,13 @@ export default function SettingsPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                const state = crypto.randomUUID();
                 const params = new URLSearchParams({
                   client_id: "55b30dd5-3520-404b-82e8-be484d13e46a",
                   redirect_uri: "https://life-os-jade-phi.vercel.app/api/whoop/callback",
                   response_type: "code",
                   scope: "read:recovery read:sleep read:workout read:profile read:cycles offline",
+                  state,
                 });
                 window.location.href = `https://api.prod.whoop.com/oauth/oauth2/auth?${params}`;
               }}
