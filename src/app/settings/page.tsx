@@ -365,7 +365,7 @@ export default function SettingsPage() {
               size="sm"
               onClick={() => {
                 const params = new URLSearchParams({
-                  client_id: process.env.NEXT_PUBLIC_WHOOP_CLIENT_ID!,
+                  client_id: "55b30dd5-3520-404b-82e8-be484d13e46a",
                   redirect_uri: "https://life-os-jade-phi.vercel.app/api/whoop/callback",
                   response_type: "code",
                   scope: "read:recovery read:sleep read:workout read:profile read:cycles offline",
