@@ -19,14 +19,14 @@ import {
   optimalGymWindow,
   recommendedBedtime,
 } from "@/lib/energy";
-import { whoopToday } from "@/lib/whoop";
+import { useWhoopToday } from "@/stores/whoop-store";
 
 /**
  * Predicted energy across the day from last night's sleep + recovery,
  * with the optimal 90-minute training window highlighted.
  */
 export function EnergyCard() {
-  const day = whoopToday();
+  const day = useWhoopToday();
   // Snapshot "now" once per mount; the marker doesn't need to tick live.
   const [nowHour] = useState(
     () => new Date().getHours() + new Date().getMinutes() / 60

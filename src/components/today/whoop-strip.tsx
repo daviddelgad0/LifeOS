@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   READINESS_COLOR,
   readiness,
-  whoopToday,
 } from "@/lib/whoop";
+import { useWhoopToday } from "@/stores/whoop-store";
 
 /** The Whoop big three, compact. Tap → full Recovery dashboard. */
 export function WhoopStrip() {
   const router = useRouter();
-  const day = whoopToday();
+  const day = useWhoopToday();
   const color = READINESS_COLOR[readiness(day.recovery)];
 
   const tiles = [

@@ -22,13 +22,12 @@ import { formatShort } from "@/lib/dates";
 import { formatHour, recommendedBedtime } from "@/lib/energy";
 import {
   READINESS_COLOR,
-  WHOOP_DAYS,
   readiness,
   readinessCopy,
   strainTarget,
   whoopInsights,
-  whoopToday,
 } from "@/lib/whoop";
+import { useWhoopDays, useWhoopToday } from "@/stores/whoop-store";
 import { cn } from "@/lib/utils";
 
 const SLEEP_COLORS = {
@@ -39,8 +38,8 @@ const SLEEP_COLORS = {
 } as const;
 
 export function GymRecoveryTab() {
-  const today = whoopToday();
-  const days = WHOOP_DAYS;
+  const today = useWhoopToday();
+  const days = useWhoopDays();
   const color = READINESS_COLOR[readiness(today.recovery)];
 
   const trend = useMemo(

@@ -23,6 +23,7 @@ import { dayStreak } from "@/lib/streaks";
 import { ACCENTS, levelFromXP } from "@/lib/xp";
 import { useAppStore } from "@/stores/app-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useWhoopStore } from "@/stores/whoop-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useIsClient } from "@/stores/hydration";
 import { useProductivityStore } from "@/stores/productivity-store";
@@ -227,6 +228,12 @@ function AuthInit() {
   return null;
 }
 
+function WhoopInit() {
+  const init = useWhoopStore((s) => s.init);
+  useEffect(() => { init(); }, [init]);
+  return null;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isClient = useIsClient();
@@ -240,6 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <AuthInit />
+      <WhoopInit />
       <AccentSync />
       <PersistSeeds />
       <ReminderCheck />

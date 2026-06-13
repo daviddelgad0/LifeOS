@@ -14,7 +14,8 @@ import {
   optimalGymWindow,
   recommendedBedtime,
 } from "@/lib/energy";
-import { strainTarget, whoopToday } from "@/lib/whoop";
+import { strainTarget } from "@/lib/whoop";
+import { useWhoopToday } from "@/stores/whoop-store";
 import { useAppStore } from "@/stores/app-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -57,6 +58,7 @@ export default function CoachPage() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const whoopDay = useWhoopToday();
   const ctx: CoachContext = useMemo(() => {
     const done = sessions.filter((s) => s.endedAt);
     const weights = measurements.filter((m) => m.weight !== undefined);
@@ -67,7 +69,7 @@ export default function CoachPage() {
     const profileComplete = Boolean(
       profile.name && profile.weightLb && profile.goal && profile.schedule
     );
-    const whoop = whoopToday();
+    const whoop = whoopDay;
     return {
       recovery: whoop.recovery,
       strainToday: whoop.strain,
@@ -101,6 +103,7 @@ export default function CoachPage() {
     profile,
     personality,
     memories,
+    whoopDay,
   ]);
 
   const chips = useMemo(() => {

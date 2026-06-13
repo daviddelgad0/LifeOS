@@ -32,8 +32,8 @@ import {
   READINESS_COLOR,
   readiness,
   readinessCopy,
-  whoopToday,
 } from "@/lib/whoop";
+import { useWhoopToday } from "@/stores/whoop-store";
 import type { Exercise, Muscle, Routine } from "@/lib/types";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { cn } from "@/lib/utils";
@@ -69,7 +69,7 @@ export function GymLogTab() {
     router.push("/gym/workout");
   };
 
-  const whoop = whoopToday();
+  const whoop = useWhoopToday();
 
   return (
     <div className="flex flex-col gap-8">

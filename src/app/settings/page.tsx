@@ -16,6 +16,7 @@ import { ACCENTS, ACHIEVEMENTS, levelFromXP } from "@/lib/xp";
 import type { CoachPersonality, Profile } from "@/lib/types";
 import { useAppStore, type NotificationPrefs } from "@/stores/app-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useWhoopStore } from "@/stores/whoop-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -72,6 +73,8 @@ export default function SettingsPage() {
   const { level } = levelFromXP(app.totalXP);
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
+  const whoopConnected = useWhoopStore((s) => s.connected);
+  const whoopDisconnect = useWhoopStore((s) => s.disconnect);
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
@@ -347,9 +350,20 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center justify-between text-sm">
           <span>Whoop</span>
-          <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-warning">
-            Simulated — OAuth in Phase 2
-          </span>
+          {whoopConnected ? (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-accent-border bg-accent-dim px-2.5 py-1 text-xs text-accent">
+                Connected
+              </span>
+              <Button variant="outline" size="sm" onClick={() => whoopDisconnect()}>
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" asChild>
+              <a href="/api/whoop/auth">Connect Whoop</a>
+            </Button>
+          )}
         </div>
         <p className="text-xs text-text-tertiary">
           Manage the Google connection in School → Sync &amp; reminders.
