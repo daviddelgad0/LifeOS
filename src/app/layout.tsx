@@ -60,7 +60,7 @@ export default function RootLayout({
         <MotionProvider>
           <AppShell>{children}</AppShell>
         </MotionProvider>
-        <Toaster position="top-center" />
+        <Toaster position="top-center" offset="calc(env(safe-area-inset-top) + 8px)" />
         <SWRegister />
       </body>
     </html>
