@@ -102,6 +102,30 @@ function mapDay(cyc: any, rec: any, slp: any): WhoopDay {
   };
 }
 
+// Page through a Whoop collection (25/page max) back to `since`. Capped at 3
+// pages (~75 records) so a runaway next_token can't loop forever.
+async function fetchCollection(
+  path: string,
+  h: HeadersInit,
+  since: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ ok: boolean; status: number; records: any[] }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const records: any[] = [];
+  let token: string | undefined;
+  for (let page = 0; page < 3; page++) {
+    const params = new URLSearchParams({ limit: "25", start: since });
+    if (token) params.set("nextToken", token);
+    const res = await fetch(`${API}${path}?${params}`, { headers: h });
+    if (!res.ok) return { ok: false, status: res.status, records };
+    const data = await res.json();
+    records.push(...(data.records ?? []));
+    token = data.next_token;
+    if (!token) break;
+  }
+  return { ok: true, status: 200, records };
+}
+
 export async function GET() {
   const jar = await cookies();
   const hadAccess = !!jar.get("whoop_access")?.value;
@@ -117,44 +141,36 @@ export async function GET() {
 
   const h = { Authorization: `Bearer ${token}` };
 
-  // 25 is Whoop's max page size — ~25 days of history, plenty for the charts.
-  const [cycleRes, recoveryRes, sleepRes] = await Promise.all([
-    fetch(`${API}/cycle?limit=25`, { headers: h }),
-    fetch(`${API}/recovery?limit=25`, { headers: h }),
-    fetch(`${API}/activity/sleep?limit=25`, { headers: h }),
+  // Page back ~31 days so the 30-day charts fill completely.
+  const since = new Date(Date.now() - 31 * 86_400_000).toISOString();
+  const [cycleC, recoveryC, sleepC] = await Promise.all([
+    fetchCollection("/cycle", h, since),
+    fetchCollection("/recovery", h, since),
+    fetchCollection("/activity/sleep", h, since),
   ]);
 
-  if (!cycleRes.ok || !recoveryRes.ok || !sleepRes.ok) {
-    const body = await cycleRes.text().catch(() => "");
+  if (!cycleC.ok || !recoveryC.ok || !sleepC.ok) {
     return NextResponse.json({
       connected: false,
       debug: {
         stage: "api_error",
-        cycle: cycleRes.status,
-        recovery: recoveryRes.status,
-        sleep: sleepRes.status,
-        sample: body.slice(0, 120),
+        cycle: cycleC.status,
+        recovery: recoveryC.status,
+        sleep: sleepC.status,
       },
     });
   }
 
-  const [cycle, recovery, sleep] = await Promise.all([
-    cycleRes.json(),
-    recoveryRes.json(),
-    sleepRes.json(),
-  ]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cycles: any[] = cycle.records ?? [];
+  const cycles = cycleC.records;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recByCycle = new Map<number, any>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (recovery.records ?? []).map((r: any) => [r.cycle_id, r])
+    recoveryC.records.map((r: any) => [r.cycle_id, r])
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sleepById = new Map<string, any>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sleep.records ?? []).map((s: any) => [s.id, s])
+    sleepC.records.map((s: any) => [s.id, s])
   );
 
   // A complete day needs cycle + its recovery + that recovery's sleep.
@@ -171,8 +187,8 @@ export async function GET() {
       debug: {
         stage: "no_records",
         cycles: cycles.length,
-        recoveries: recovery.records?.length ?? 0,
-        sleeps: sleep.records?.length ?? 0,
+        recoveries: recoveryC.records.length,
+        sleeps: sleepC.records.length,
       },
     });
   }
@@ -180,5 +196,5 @@ export async function GET() {
   // Oldest first so the charts read left-to-right and days[last] is today.
   days.sort((a, b) => a.date.localeCompare(b.date));
 
-  return NextResponse.json({ connected: true, days });
+  return NextResponse.json({ connected: true, days: days.slice(-30) });
 }
