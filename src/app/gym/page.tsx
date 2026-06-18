@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GymLogTab } from "@/components/gym/log-tab";
 import { GymProgressTab } from "@/components/gym/progress-tab";
 import { GymRecoveryTab } from "@/components/gym/recovery-tab";
+import { GymRunsTab } from "@/components/gym/runs-tab";
 import { GymStrengthTab } from "@/components/gym/strength-tab";
 import { GymTrackersTab } from "@/components/gym/trackers-tab";
 
-const TABS = ["log", "recovery", "progress", "strength", "trackers"];
+const TABS = ["log", "recovery", "progress", "strength", "runs", "trackers"];
 
 export default function GymPage() {
   // Deep-linkable (/gym?tab=recovery). Safe to read location here: the
@@ -28,11 +29,12 @@ export default function GymPage() {
         onValueChange={(v) => v && setTab(v)}
         className="flex flex-col gap-6"
       >
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="log">Log</TabsTrigger>
           <TabsTrigger value="recovery">Recovery</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="strength">Strength</TabsTrigger>
+          <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="trackers">Trackers</TabsTrigger>
         </TabsList>
         <TabsContent value="log">
@@ -46,6 +48,9 @@ export default function GymPage() {
         </TabsContent>
         <TabsContent value="strength">
           <GymStrengthTab />
+        </TabsContent>
+        <TabsContent value="runs">
+          <GymRunsTab />
         </TabsContent>
         <TabsContent value="trackers">
           <GymTrackersTab />

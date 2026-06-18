@@ -1,57 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { WhoopDay } from "@/lib/whoop";
+import { getWhoopToken } from "@/lib/whoop-token";
 
 const API = "https://api.prod.whoop.com/developer/v2";
 
 // Always run fresh — this reads auth cookies and must never be cached.
 export const dynamic = "force-dynamic";
-
-async function getToken(): Promise<string | null> {
-  const jar = await cookies();
-  const access = jar.get("whoop_access")?.value;
-  if (access) return access;
-
-  const refresh = jar.get("whoop_refresh")?.value;
-  if (!refresh) return null;
-
-  const res = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refresh,
-      client_id: "55b30dd5-3520-404b-82e8-be484d13e46a",
-      client_secret: process.env.WHOOP_CLIENT_SECRET ?? "",
-      // Required for Whoop to return a fresh refresh_token alongside the access one.
-      scope: "offline",
-    }),
-  });
-  if (!res.ok) return null;
-
-  const { access_token, refresh_token, expires_in } = await res.json();
-  const secure = process.env.NODE_ENV === "production";
-  jar.set("whoop_access", access_token, {
-    httpOnly: true,
-    secure,
-    maxAge: expires_in ?? 3600,
-    path: "/",
-    sameSite: "lax",
-  });
-  // Whoop rotates the refresh token on every refresh. Persist the new one and
-  // roll its 30-day window forward, so the connection stays alive indefinitely
-  // as long as the app is opened at least once a month.
-  if (refresh_token) {
-    jar.set("whoop_refresh", refresh_token, {
-      httpOnly: true,
-      secure,
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-      sameSite: "lax",
-    });
-  }
-  return access_token;
-}
 
 const milli = (ms: number) => Math.round((ms / 3_600_000) * 10) / 10;
 
@@ -131,7 +86,7 @@ export async function GET() {
   const hadAccess = !!jar.get("whoop_access")?.value;
   const hadRefresh = !!jar.get("whoop_refresh")?.value;
 
-  const token = await getToken();
+  const token = await getWhoopToken();
   if (!token) {
     return NextResponse.json({
       connected: false,
