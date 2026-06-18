@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 
 const REDIRECT_URI =
   "https://life-os-jade-phi.vercel.app/api/google-calendar/callback";
+const CLIENT_ID =
+  "69828376765-9hb2hn88uvnqs762btbtkkp5u5ihfuuv.apps.googleusercontent.com";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
       grant_type: "authorization_code",
       code,
       redirect_uri: REDIRECT_URI,
-      client_id: process.env.GOOGLE_CLIENT_ID ?? "",
+      client_id: CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     }),
   });

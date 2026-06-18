@@ -37,7 +37,7 @@ async function getToken(): Promise<string | null> {
     body: new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refresh,
-      client_id: process.env.GOOGLE_CLIENT_ID ?? "",
+      client_id: "69828376765-9hb2hn88uvnqs762btbtkkp5u5ihfuuv.apps.googleusercontent.com",
       client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     }),
   });

@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// Public OAuth client id — hardcoded so a missing env var can't break the
+// connect flow. Only GOOGLE_CLIENT_SECRET must live in the environment.
+export const GOOGLE_CLIENT_ID =
+  "69828376765-9hb2hn88uvnqs762btbtkkp5u5ihfuuv.apps.googleusercontent.com";
 const REDIRECT_URI =
   "https://life-os-jade-phi.vercel.app/api/google-calendar/callback";
 const SCOPE = "https://www.googleapis.com/auth/calendar";
 
 // Returns the Google OAuth URL as JSON. The client navigates to it directly
-// (a server-side redirect to an external domain bounces inside an iOS PWA),
-// and the client_id stays server-side instead of needing a NEXT_PUBLIC var.
+// (a server-side redirect to an external domain bounces inside an iOS PWA).
 export async function GET() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) {
-    return NextResponse.json({ error: "not_configured" }, { status: 500 });
-  }
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: GOOGLE_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: "code",
     scope: SCOPE,
