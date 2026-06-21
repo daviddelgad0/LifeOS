@@ -51,6 +51,7 @@ export default function CoachPage() {
   const sessions = useWorkoutStore((s) => s.sessions);
   const manualGymDays = useWorkoutStore((s) => s.manualGymDays);
   const customExercises = useWorkoutStore((s) => s.customExercises);
+  const addRoutine = useWorkoutStore((s) => s.addRoutine);
   const measurements = useWorkoutStore((s) => s.measurements);
   const tasks = useTaskStore((s) => s.tasks);
   const classes = useTaskStore((s) => s.classes);
@@ -127,12 +128,14 @@ export default function CoachPage() {
     });
   }, [messages.length, typing]);
 
-  const send = async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || typing) return;
-    sendUser(trimmed);
-    setInput("");
+  // "make me a PPL split", "build an upper/lower routine", "put a push pull
+  // legs program in" → generate routines, not just chat. Needs both a split
+  // noun and a create verb so questions ("what split should I run?") still chat.
+  const wantsSplit = (t: string) =>
+    /\b(split|routine|program|workout plan|ppl|push[\s/-]?pull[\s/-]?legs|upper[\s/-]?lower|full[\s/-]?body|bro split)\b/i.test(t) &&
+    /\b(make|create|build|set\s?up|give me|generate|put|add|design|write|plan me|build me)\b/i.test(t);
 
+  const runChat = async (trimmed: string) => {
     try {
       const res = await fetch("/api/coach", {
         method: "POST",
@@ -157,6 +160,43 @@ export default function CoachPage() {
       // Fallback to mock engine if API is unavailable
       receiveCoach(coachReply(trimmed, ctx));
     }
+  };
+
+  const runSplit = async (trimmed: string) => {
+    try {
+      const res = await fetch("/api/coach/split", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, profile }),
+      });
+      if (!res.ok) throw new Error("split_failed");
+      const data = (await res.json()) as {
+        reply: string;
+        routines: { name: string; exercises: unknown[] }[];
+      };
+      if (!data.routines?.length) throw new Error("empty");
+      for (const r of data.routines) {
+        addRoutine(r as Parameters<typeof addRoutine>[0]);
+      }
+      const summary = data.routines
+        .map((r) => `${r.name} (${r.exercises.length})`)
+        .join(" · ");
+      receiveCoach(
+        `${data.reply}\n\nAdded to Gym → Log: ${summary}. Tap a routine there to start it.`
+      );
+    } catch {
+      // If split generation fails, just answer in normal chat instead.
+      await runChat(trimmed);
+    }
+  };
+
+  const send = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || typing) return;
+    sendUser(trimmed);
+    setInput("");
+    if (wantsSplit(trimmed)) await runSplit(trimmed);
+    else await runChat(trimmed);
   };
 
   return (
