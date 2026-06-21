@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Clock, Download, Lock } from "lucide-react";
+import { Check, Clock, Download, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -80,6 +88,27 @@ export default function SettingsPage() {
   const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+
+  // Wipe the demo/seed activity while keeping profile + settings. The cleared
+  // state persists locally and syncs up to Supabase, so it won't come back.
+  const startFresh = () => {
+    useWorkoutStore.setState({
+      sessions: [],
+      measurements: [],
+      manualGymDays: [],
+      active: null,
+      lastPR: null,
+    });
+    useTaskStore.setState({ tasks: [], classes: [] });
+    useProductivityStore.setState({ ratings: {} });
+    useChatStore.setState({ messages: [], memories: [] });
+    useAppStore.setState({ totalXP: 0, achievements: {}, coachMessagesSent: 0 });
+    setResetOpen(false);
+    toast.success("Fresh start", {
+      description: "Demo data cleared — the app is all yours now.",
+    });
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -462,6 +491,47 @@ export default function SettingsPage() {
           Data syncs to Supabase automatically when you&apos;re signed in.
         </p>
       </Section>
+
+      <Section title="Start fresh">
+        <p className="text-sm text-text-secondary">
+          LifeOS ships with demo workouts, classes, and tasks. Clear them to
+          start logging only your own data. Your profile and settings stay.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start text-danger hover:text-danger"
+          onClick={() => setResetOpen(true)}
+        >
+          <Trash2 data-icon="inline-start" className="size-3.5" />
+          Clear demo data
+        </Button>
+      </Section>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear demo data?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes the demo workouts, classes, tasks, body
+              measurements, coach chat, and resets your XP/level to zero. Your
+              profile, goals, and settings are kept. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" size="sm" onClick={() => setResetOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-danger text-white hover:bg-danger/90"
+              onClick={startFresh}
+            >
+              Clear everything
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Section title="Account">
         <div className="flex items-center justify-between text-sm">
