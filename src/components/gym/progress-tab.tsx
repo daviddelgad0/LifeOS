@@ -61,7 +61,8 @@ import { buildInsights, exerciseHistory } from "@/lib/insights";
 import { dayStreak, longestDayStreak } from "@/lib/streaks";
 import type { Muscle, WorkoutSession } from "@/lib/types";
 import { useAppStore } from "@/stores/app-store";
-import { toDisplayTotal, toDisplayWeight, toStoredWeight } from "@/lib/units";
+import { toDisplayTotal, toDisplayWeight } from "@/lib/units";
+import { MeasurementDialog } from "@/components/gym/measurement-dialog";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -905,83 +906,3 @@ function LandmarkBar({
   );
 }
 
-function MeasurementDialog({
-  open,
-  onOpenChange,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onSave: (m: {
-    date: string;
-    weight?: number;
-    bodyFat?: number;
-    chest?: number;
-    arms?: number;
-    waist?: number;
-    thighs?: number;
-  }) => void;
-}) {
-  const units = useAppStore((s) => s.units);
-  const [form, setForm] = useState({
-    weight: "",
-    bodyFat: "",
-    chest: "",
-    arms: "",
-    waist: "",
-    thighs: "",
-  });
-
-  const fields = [
-    ["weight", `Weight (${units})`],
-    ["bodyFat", "Body fat %"],
-    ["chest", "Chest (in)"],
-    ["arms", "Arms (in)"],
-    ["waist", "Waist (in)"],
-    ["thighs", "Thighs (in)"],
-  ] as const;
-
-  const save = () => {
-    const num = (v: string) => (v.trim() === "" ? undefined : parseFloat(v));
-    // Body weight is entered in the display unit but stored in lb.
-    const w = num(form.weight);
-    onSave({
-      date: todayISO(),
-      weight: w === undefined ? undefined : toStoredWeight(w, units),
-      bodyFat: num(form.bodyFat),
-      chest: num(form.chest),
-      arms: num(form.arms),
-      waist: num(form.waist),
-      thighs: num(form.thighs),
-    });
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Log measurements</DialogTitle>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          {fields.map(([key, label]) => (
-            <div key={key} className="flex flex-col gap-1.5">
-              <Label htmlFor={`m-${key}`} className="text-xs">
-                {label}
-              </Label>
-              <Input
-                id={`m-${key}`}
-                type="number"
-                inputMode="decimal"
-                value={form[key]}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                placeholder="—"
-              />
-            </div>
-          ))}
-        </div>
-        <Button onClick={save}>Save for today</Button>
-      </DialogContent>
-    </Dialog>
-  );
-}
