@@ -22,9 +22,10 @@ export function SyncManager() {
     // Pull cloud → localStorage → rehydrate stores on login.
     pullAll().then(async (count) => {
       if (count === 0) return;
-      // A workout may have been started locally while this pull was in flight.
-      // Snapshot it so the cloud rehydrate can't silently discard an
-      // in-progress session (and its rest timer).
+      // active + restTimer are device-local, in-session state. Snapshot them
+      // before the cloud rehydrate and always restore the local value, so the
+      // login pull can neither wipe a just-started workout nor resurrect a
+      // just-discarded one (cloud lags behind by the 2s push debounce).
       const liveActive = useWorkoutStore.getState().active;
       const liveRest = useWorkoutStore.getState().restTimer;
 
@@ -36,9 +37,7 @@ export function SyncManager() {
         useChatStore.persist.rehydrate(),
       ]);
 
-      if (liveActive && !liveActive.endedAt) {
-        useWorkoutStore.setState({ active: liveActive, restTimer: liveRest });
-      }
+      useWorkoutStore.setState({ active: liveActive, restTimer: liveRest });
     });
 
     // Push on store changes (debounced per key).
