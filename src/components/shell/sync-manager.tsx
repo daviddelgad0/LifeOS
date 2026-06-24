@@ -20,13 +20,24 @@ export function SyncManager() {
     if (!userId) return;
 
     // Pull cloud → localStorage → rehydrate stores on login.
-    pullAll().then((count) => {
-      if (count > 0) {
-        useAppStore.persist.rehydrate();
-        useWorkoutStore.persist.rehydrate();
-        useTaskStore.persist.rehydrate();
-        useProductivityStore.persist.rehydrate();
-        useChatStore.persist.rehydrate();
+    pullAll().then(async (count) => {
+      if (count === 0) return;
+      // A workout may have been started locally while this pull was in flight.
+      // Snapshot it so the cloud rehydrate can't silently discard an
+      // in-progress session (and its rest timer).
+      const liveActive = useWorkoutStore.getState().active;
+      const liveRest = useWorkoutStore.getState().restTimer;
+
+      await Promise.all([
+        useAppStore.persist.rehydrate(),
+        useWorkoutStore.persist.rehydrate(),
+        useTaskStore.persist.rehydrate(),
+        useProductivityStore.persist.rehydrate(),
+        useChatStore.persist.rehydrate(),
+      ]);
+
+      if (liveActive && !liveActive.endedAt) {
+        useWorkoutStore.setState({ active: liveActive, restTimer: liveRest });
       }
     });
 
