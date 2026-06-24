@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 const METERS_PER_MILE = 1609.344;
 
-export interface Run {
+export interface Cardio {
   id: string;
+  sport: string; // formatted activity name, e.g. "Walking"
   date: string; // YYYY-MM-DD (local)
   durationMin: number;
   distanceMi: number;
@@ -18,6 +19,17 @@ export interface Run {
   maxHr: number;
   strain: number;
   calories: number;
+}
+
+// Any non-strength activity counts as cardio — keyword match keeps it robust
+// to Whoop's exact sport_name strings (walking, hiking, cycling, elliptical…).
+const CARDIO =
+  /run|jog|walk|hik|ruck|cycl|bik|spin|ellipt|stair|row|swim|cardio|treadmill|climb|skat|ski|dance|hiit|elliptical/i;
+
+function titleCase(s: string): string {
+  return (s || "Activity")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function localDate(iso: string, offset: string): string {
@@ -29,21 +41,21 @@ function localDate(iso: string, offset: string): string {
 
 export async function GET() {
   const token = await getWhoopToken();
-  if (!token) return NextResponse.json({ connected: false, runs: [] });
+  if (!token) return NextResponse.json({ connected: false, sessions: [] });
 
   const res = await fetch(`${API}/activity/workout?limit=25`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    return NextResponse.json({ connected: false, runs: [], status: res.status });
+    return NextResponse.json({ connected: false, sessions: [], status: res.status });
   }
 
   const data = await res.json();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const records: any[] = data.records ?? [];
 
-  const runs: Run[] = records
-    .filter((w) => w.sport_name === "running" || w.sport_id === 1)
+  const sessions: Cardio[] = records
+    .filter((w) => CARDIO.test(w.sport_name ?? ""))
     .map((w) => {
       const ms = new Date(w.end).getTime() - new Date(w.start).getTime();
       const durationMin = Math.round((ms / 60000) * 10) / 10;
@@ -53,6 +65,7 @@ export async function GET() {
         distanceMi > 0 ? Math.round((durationMin / distanceMi) * 10) / 10 : null;
       return {
         id: String(w.id),
+        sport: titleCase(w.sport_name ?? ""),
         date: localDate(w.start, w.timezone_offset ?? "+00:00"),
         durationMin,
         distanceMi,
@@ -65,5 +78,5 @@ export async function GET() {
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  return NextResponse.json({ connected: true, runs });
+  return NextResponse.json({ connected: true, sessions });
 }

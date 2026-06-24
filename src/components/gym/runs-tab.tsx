@@ -10,8 +10,9 @@ import { StatCard } from "@/components/stat-card";
 import { AXIS, ChartBox, TOOLTIP_STYLE } from "@/components/gym/chart-box";
 import { formatShort, startOfWeek, todayISO } from "@/lib/dates";
 
-interface Run {
+interface Cardio {
   id: string;
+  sport: string;
   date: string;
   durationMin: number;
   distanceMi: number;
@@ -38,44 +39,44 @@ function formatDuration(min: number): string {
 
 export function GymRunsTab() {
   const [state, setState] = useState<"loading" | "off" | "ready">("loading");
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [items, setItems] = useState<Cardio[]>([]);
 
   useEffect(() => {
     fetch("/api/whoop/workouts", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { connected: boolean; runs: Run[] }) => {
+      .then((d: { connected: boolean; sessions: Cardio[] }) => {
         if (!d.connected) {
           setState("off");
           return;
         }
-        setRuns(d.runs ?? []);
+        setItems(d.sessions ?? []);
         setState("ready");
       })
       .catch(() => setState("off"));
   }, []);
 
   const weekStart = startOfWeek(todayISO());
-  const weekRuns = useMemo(
-    () => runs.filter((r) => r.date >= weekStart),
-    [runs, weekStart]
+  const weekItems = useMemo(
+    () => items.filter((r) => r.date >= weekStart),
+    [items, weekStart]
   );
 
-  const weekMiles = Math.round(weekRuns.reduce((a, r) => a + r.distanceMi, 0) * 10) / 10;
-  const paced = runs.filter((r) => r.paceMinPerMi);
+  const weekMiles = Math.round(weekItems.reduce((a, r) => a + r.distanceMi, 0) * 10) / 10;
+  const weekMin = Math.round(weekItems.reduce((a, r) => a + r.durationMin, 0));
+  const paced = items.filter((r) => r.paceMinPerMi);
   const avgPace =
     paced.length > 0
       ? paced.reduce((a, r) => a + (r.paceMinPerMi ?? 0), 0) / paced.length
       : null;
-  const totalMiles = Math.round(runs.reduce((a, r) => a + r.distanceMi, 0) * 10) / 10;
 
-  // Oldest → newest for the chart.
+  // Oldest → newest for the chart; minutes works for every cardio type.
   const chart = useMemo(
     () =>
-      [...runs]
+      [...items]
         .reverse()
         .slice(-12)
-        .map((r) => ({ date: formatShort(r.date), miles: r.distanceMi })),
-    [runs]
+        .map((r) => ({ date: formatShort(r.date), min: r.durationMin })),
+    [items]
   );
 
   if (state === "loading") {
@@ -91,16 +92,16 @@ export function GymRunsTab() {
     return (
       <EmptyState
         icon={Footprints}
-        description="Connect your Whoop in Settings to pull your runs here automatically — distance, pace, heart rate, and strain for every run."
+        description="Connect your Whoop in Settings to pull your cardio here automatically — runs, walks, rides, hikes, and more with pace, heart rate, and strain."
       />
     );
   }
 
-  if (runs.length === 0) {
+  if (items.length === 0) {
     return (
       <EmptyState
         icon={Footprints}
-        description="No runs on Whoop yet. Track a run on your band and it'll show up here with distance, pace, and heart rate."
+        description="No cardio on Whoop yet. Log a run, walk, or any cardio activity on your band and it'll show up here."
       />
     );
   }
@@ -108,15 +109,16 @@ export function GymRunsTab() {
   return (
     <div className="flex flex-col gap-8">
       <p className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-text-tertiary">
-        Runs pulled live from your Whoop. Distance in miles, pace per mile.
+        Cardio pulled live from your Whoop — runs, walks, rides, and more.
+        Distance in miles, pace per mile where your band recorded it.
       </p>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="This week" value={weekMiles} suffix=" mi" />
-        <StatCard label="Runs this week" value={weekRuns.length} />
-        <StatCard label="Last 25 runs" value={totalMiles} suffix=" mi" />
+        <StatCard label="Sessions this week" value={weekItems.length} />
+        <StatCard label="Active this week" value={weekMin} suffix=" min" />
         <div className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4">
-          <span className="text-xs text-text-tertiary">Avg pace</span>
+          <span className="text-xs text-text-tertiary">Avg run pace</span>
           <span className="font-mono text-2xl font-medium">
             {avgPace ? formatPace(avgPace) : "—"}
             {avgPace && <span className="text-sm text-text-tertiary"> /mi</span>}
@@ -126,34 +128,37 @@ export function GymRunsTab() {
 
       <section className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
         <h2 className="flex items-center gap-2 text-sm font-medium text-text-tertiary">
-          <Activity className="size-3.5" /> Distance per run
+          <Activity className="size-3.5" /> Minutes per session
         </h2>
         <ChartBox height={180}>
           {(w, h) => (
             <BarChart width={w} height={h} data={chart}>
               <XAxis dataKey="date" {...AXIS} />
-              <YAxis {...AXIS} width={32} unit="mi" />
+              <YAxis {...AXIS} width={32} unit="m" />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                formatter={(v) => [`${v} mi`, "distance"]}
+                formatter={(v) => [`${v} min`, "duration"]}
               />
-              <Bar dataKey="miles" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="min" fill="var(--accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
           )}
         </ChartBox>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-text-tertiary">Recent runs</h2>
-        {runs.map((r) => (
+        <h2 className="text-sm font-medium text-text-tertiary">Recent cardio</h2>
+        {items.map((r) => (
           <div
             key={r.id}
             className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3"
           >
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-medium">
-                {r.distanceMi > 0 ? `${r.distanceMi} mi` : "Run"}
+                {r.sport}
+                {r.distanceMi > 0 && (
+                  <span className="text-text-secondary"> · {r.distanceMi} mi</span>
+                )}
               </span>
               <span className="text-xs text-text-tertiary">{formatShort(r.date)}</span>
             </div>

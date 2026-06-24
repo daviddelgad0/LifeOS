@@ -34,7 +34,7 @@ export default function GymPage() {
           <TabsTrigger value="recovery">Recovery</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="strength">Strength</TabsTrigger>
-          <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="runs">Cardio</TabsTrigger>
           <TabsTrigger value="trackers">Trackers</TabsTrigger>
         </TabsList>
         <TabsContent value="log">
