@@ -51,12 +51,24 @@ export interface WorkoutExercise {
   sets: SetEntry[];
 }
 
+export interface CardioEntry {
+  id: string;
+  type: string; // "Incline walk", "Run", "Bike", "Row", "Elliptical", "Stairs", "Other"
+  durationMin: number;
+  distanceMi?: number;
+  incline?: number; // %
+  speed?: number; // mph
+  calories?: number;
+  note?: string;
+}
+
 export interface WorkoutSession {
   id: string;
   date: string; // ISO yyyy-mm-dd
   startedAt: number;
   endedAt: number | null;
   exercises: WorkoutExercise[];
+  cardio?: CardioEntry[];
   note?: string;
 }
 

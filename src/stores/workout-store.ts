@@ -13,6 +13,7 @@ import {
   SEED_SESSIONS,
 } from "@/lib/seed";
 import type {
+  CardioEntry,
   Exercise,
   Measurement,
   Routine,
@@ -57,6 +58,10 @@ interface WorkoutState {
   deleteSet: (weId: string, setId: string) => void;
   toggleSetComplete: (weId: string, setId: string) => void;
   setExerciseRest: (weId: string, seconds: number) => void;
+
+  addCardio: (entry: Omit<CardioEntry, "id">) => void;
+  updateCardio: (id: string, patch: Partial<CardioEntry>) => void;
+  removeCardio: (id: string) => void;
 
   startRest: (seconds: number, label: string) => void;
   adjustRest: (deltaSeconds: number) => void;
@@ -149,6 +154,7 @@ export const useWorkoutStore = create<WorkoutState>()(
             startedAt: Date.now(),
             endedAt: null,
             exercises,
+            cardio: [],
           },
         });
       },
@@ -166,7 +172,11 @@ export const useWorkoutStore = create<WorkoutState>()(
             we.sets.some((s) => s.completed)
           ),
         };
-        if (finished.exercises.length === 0) {
+        // Keep the session if it has completed lifts OR any logged cardio.
+        if (
+          finished.exercises.length === 0 &&
+          (finished.cardio?.length ?? 0) === 0
+        ) {
           set({ active: null, restTimer: null });
           return;
         }
@@ -373,6 +383,44 @@ export const useWorkoutStore = create<WorkoutState>()(
         ),
 
       clearRest: () => set({ restTimer: null }),
+
+      addCardio: (entry) =>
+        set((s) =>
+          s.active
+            ? {
+                active: {
+                  ...s.active,
+                  cardio: [...(s.active.cardio ?? []), { ...entry, id: newId() }],
+                },
+              }
+            : s
+        ),
+
+      updateCardio: (id, patch) =>
+        set((s) =>
+          s.active
+            ? {
+                active: {
+                  ...s.active,
+                  cardio: (s.active.cardio ?? []).map((c) =>
+                    c.id === id ? { ...c, ...patch } : c
+                  ),
+                },
+              }
+            : s
+        ),
+
+      removeCardio: (id) =>
+        set((s) =>
+          s.active
+            ? {
+                active: {
+                  ...s.active,
+                  cardio: (s.active.cardio ?? []).filter((c) => c.id !== id),
+                },
+              }
+            : s
+        ),
 
       addRoutine: (routine) =>
         set((s) => ({ routines: [...s.routines, { ...routine, id: newId() }] })),

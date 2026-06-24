@@ -19,6 +19,7 @@ import {
 
 import { EmptyState } from "@/components/empty-state";
 import { ExercisePicker } from "@/components/exercise-picker";
+import { CardioSheet, type CardioTarget } from "@/components/gym/cardio-sheet";
 import { PRCelebration } from "@/components/gym/pr-celebration";
 import { RestTimerBar } from "@/components/gym/rest-timer-bar";
 import {
@@ -48,7 +49,7 @@ import {
   sessionDurationMin,
   sessionVolume,
 } from "@/lib/fitness";
-import type { Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
+import type { CardioEntry, Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
 import { previousSets, useWorkoutStore } from "@/stores/workout-store";
 import { useAppStore } from "@/stores/app-store";
 import { toDisplayWeight, toDisplayTotal } from "@/lib/units";
@@ -194,6 +195,15 @@ function SetRow({
   );
 }
 
+function cardioSummary(c: CardioEntry): string {
+  const parts = [`${c.durationMin} min`];
+  if (c.distanceMi) parts.push(`${c.distanceMi} mi`);
+  if (c.incline) parts.push(`${c.incline}% incline`);
+  if (c.speed) parts.push(`${c.speed} mph`);
+  if (c.calories) parts.push(`${c.calories} kcal`);
+  return parts.join(" · ");
+}
+
 export default function ActiveWorkoutPage() {
   const router = useRouter();
   const active = useWorkoutStore((s) => s.active);
@@ -209,11 +219,15 @@ export default function ActiveWorkoutPage() {
   const discardWorkout = useWorkoutStore((s) => s.discardWorkout);
   const lastPR = useWorkoutStore((s) => s.lastPR);
   const clearLastPR = useWorkoutStore((s) => s.clearLastPR);
+  const addCardio = useWorkoutStore((s) => s.addCardio);
+  const updateCardio = useWorkoutStore((s) => s.updateCardio);
+  const removeCardio = useWorkoutStore((s) => s.removeCardio);
   const units = useAppStore((s) => s.units);
 
   const [editor, setEditor] = useState<SetEditorTarget | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [cardioTarget, setCardioTarget] = useState<CardioTarget | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [note, setNote] = useState("");
 
@@ -457,6 +471,49 @@ export default function ActiveWorkoutPage() {
             Add exercise
           </Button>
         )}
+
+        {/* Cardio */}
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-text-tertiary">Cardio</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setCardioTarget({ id: null, entry: { type: "Incline walk", durationMin: 0 } })
+              }
+            >
+              <Plus data-icon="inline-start" className="size-4" />
+              Add cardio
+            </Button>
+          </div>
+          {(active.cardio ?? []).map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center gap-2 rounded-xl border border-border bg-surface p-3"
+            >
+              <button
+                type="button"
+                onClick={() => setCardioTarget({ id: c.id, entry: c })}
+                className="flex flex-1 flex-col text-left"
+              >
+                <span className="text-sm font-medium">{c.type}</span>
+                <span className="font-mono text-xs text-text-tertiary">
+                  {cardioSummary(c)}
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-label="Delete cardio"
+                onClick={() => removeCardio(c.id)}
+                className="rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-muted hover:text-danger"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+        </section>
+
         <p className="text-center text-xs text-text-tertiary">
           Swipe a set left to delete it. Tap prev to copy last session.
         </p>
@@ -476,6 +533,15 @@ export default function ActiveWorkoutPage() {
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onPick={(ex) => addExerciseToActive(ex.id)}
+      />
+
+      <CardioSheet
+        target={cardioTarget}
+        onClose={() => setCardioTarget(null)}
+        onSave={(id, entry) => {
+          if (id) updateCardio(id, entry);
+          else addCardio(entry);
+        }}
       />
 
       <Dialog open={endOpen} onOpenChange={setEndOpen}>
@@ -519,9 +585,17 @@ export default function ActiveWorkoutPage() {
               Trained: {musclesHit.join(", ")}
             </p>
           )}
-          {completedSets === 0 && (
+          {(active.cardio?.length ?? 0) > 0 && (
+            <p className="text-xs text-text-secondary">
+              Cardio:{" "}
+              {active.cardio!
+                .map((c) => `${c.type} ${c.durationMin}m`)
+                .join(", ")}
+            </p>
+          )}
+          {completedSets === 0 && (active.cardio?.length ?? 0) === 0 && (
             <p className="text-xs text-warning">
-              No completed sets — ending now will discard this session.
+              Nothing logged — ending now will discard this session.
             </p>
           )}
           <Textarea
