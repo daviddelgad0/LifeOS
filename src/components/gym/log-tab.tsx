@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ExercisePreview } from "@/components/exercise-preview";
 import { RoutineEditor } from "@/components/gym/routine-editor";
 import { CustomExerciseDialog } from "@/components/gym/custom-exercise-dialog";
+import { WorkoutHistory } from "@/components/gym/workout-history";
 import { allExercises, getExercise } from "@/lib/exercises";
 import { MUSCLES } from "@/lib/fitness";
 import {
@@ -182,6 +183,8 @@ export function GymLogTab() {
         )}
       </section>
 
+      <WorkoutHistory />
+
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-text-tertiary">
@@ -197,7 +200,7 @@ export function GymLogTab() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search 71+ exercises"
+            placeholder="Search 150+ exercises"
             className="pl-9"
           />
         </div>

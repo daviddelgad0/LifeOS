@@ -22,12 +22,15 @@ export function SyncManager() {
     // Pull cloud → localStorage → rehydrate stores on login.
     pullAll().then(async (count) => {
       if (count === 0) return;
-      // active + restTimer are device-local, in-session state. Snapshot them
-      // before the cloud rehydrate and always restore the local value, so the
-      // login pull can neither wipe a just-started workout nor resurrect a
-      // just-discarded one (cloud lags behind by the 2s push debounce).
-      const liveActive = useWorkoutStore.getState().active;
-      const liveRest = useWorkoutStore.getState().restTimer;
+      // Snapshot device-local workout state before the cloud rehydrate. The
+      // cloud lags local by the 2s push debounce, so a workout finished or
+      // started just before this pull would otherwise be lost when the
+      // rehydrate overwrites in-memory state with stale cloud data.
+      const before = useWorkoutStore.getState();
+      const liveActive = before.active;
+      const liveRest = before.restTimer;
+      const localSessions = before.sessions;
+      const localMeasurements = before.measurements;
 
       await Promise.all([
         useAppStore.persist.rehydrate(),
@@ -37,7 +40,21 @@ export function SyncManager() {
         useChatStore.persist.rehydrate(),
       ]);
 
-      useWorkoutStore.setState({ active: liveActive, restTimer: liveRest });
+      // Merge append-only history (sessions/measurements) so locally-logged
+      // entries survive alongside any from other devices. active/restTimer are
+      // session-local — the device's own value always wins.
+      const cloud = useWorkoutStore.getState();
+      const byId = new Map(cloud.sessions.map((s) => [s.id, s]));
+      for (const s of localSessions) if (!byId.has(s.id)) byId.set(s.id, s);
+      const byDate = new Map(cloud.measurements.map((m) => [m.date, m]));
+      for (const m of localMeasurements) byDate.set(m.date, m);
+
+      useWorkoutStore.setState({
+        sessions: [...byId.values()].sort((a, b) => a.date.localeCompare(b.date)),
+        measurements: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+        active: liveActive,
+        restTimer: liveRest,
+      });
     });
 
     // Push on store changes (debounced per key).
