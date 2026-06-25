@@ -69,6 +69,7 @@ export interface WorkoutSession {
   endedAt: number | null;
   exercises: WorkoutExercise[];
   cardio?: CardioEntry[];
+  gym?: string; // where it happened — scopes weight comparisons
   note?: string;
 }
 

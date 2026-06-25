@@ -20,6 +20,7 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { CardioSheet, type CardioTarget } from "@/components/gym/cardio-sheet";
+import { GymSelector } from "@/components/gym/gym-selector";
 import { PRCelebration } from "@/components/gym/pr-celebration";
 import { RestTimerBar } from "@/components/gym/rest-timer-bar";
 import {
@@ -323,6 +324,9 @@ export default function ActiveWorkoutPage() {
               End workout
             </Button>
           </div>
+        </div>
+        <div className="mx-auto -mt-1 flex max-w-3xl items-center gap-2 px-4 pb-2">
+          <GymSelector forActive className="w-40" />
         </div>
       </header>
 

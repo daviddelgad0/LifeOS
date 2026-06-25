@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ExercisePreview } from "@/components/exercise-preview";
 import { RoutineEditor } from "@/components/gym/routine-editor";
 import { CustomExerciseDialog } from "@/components/gym/custom-exercise-dialog";
+import { GymSelector } from "@/components/gym/gym-selector";
 import { WorkoutHistory } from "@/components/gym/workout-history";
 import { allExercises, getExercise } from "@/lib/exercises";
 import { MUSCLES } from "@/lib/fitness";
@@ -106,6 +107,14 @@ export function GymLogTab() {
           <ArrowRight className="size-4 text-accent" />
         </button>
       )}
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-text-tertiary">Training at</span>
+        <GymSelector className="w-40" />
+        <span className="text-[0.65rem] text-text-tertiary">
+          — weights compare within a gym
+        </span>
+      </div>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

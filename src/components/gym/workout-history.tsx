@@ -64,7 +64,12 @@ export function WorkoutHistory() {
               className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:border-border-hover"
             >
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{formatShort(s.date)}</span>
+                <span className="text-sm font-medium">
+                  {formatShort(s.date)}
+                  {s.gym && (
+                    <span className="font-normal text-text-tertiary"> · {s.gym}</span>
+                  )}
+                </span>
                 <span className="font-mono text-xs text-text-tertiary">
                   {s.exercises.length > 0 &&
                     `${s.exercises.length} exercises · ${setCount} sets · ${toDisplayTotal(
@@ -86,7 +91,14 @@ export function WorkoutHistory() {
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-h-[80vh] max-w-sm overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{detail && formatShort(detail.date)}</DialogTitle>
+            <DialogTitle>
+              {detail && formatShort(detail.date)}
+              {detail?.gym && (
+                <span className="ml-2 text-xs font-normal text-text-tertiary">
+                  {detail.gym}
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {detail && (
             <div className="flex flex-col gap-4 text-sm">

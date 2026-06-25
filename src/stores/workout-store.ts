@@ -46,6 +46,9 @@ interface WorkoutState {
   restTimer: RestTimer | null;
   /** Ephemeral — set on PR hit, cleared by PRCelebration component. Not persisted. */
   lastPR: LastPR | null;
+  /** Gyms the user trains at; weights are compared within the same gym. */
+  gyms: string[];
+  currentGym: string;
 
   startWorkout: (routine?: Routine) => void;
   discardWorkout: () => void;
@@ -68,6 +71,10 @@ interface WorkoutState {
   clearRest: () => void;
   clearLastPR: () => void;
 
+  addGym: (name: string) => void;
+  setCurrentGym: (name: string) => void;
+  setActiveGym: (name: string) => void;
+
   addRoutine: (routine: Omit<Routine, "id">) => void;
   updateRoutine: (id: string, patch: Partial<Routine>) => void;
   deleteRoutine: (id: string) => void;
@@ -79,12 +86,19 @@ interface WorkoutState {
 const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+// A session counts toward a gym's comparisons if it's at that gym, or has no
+// gym recorded (legacy/untagged sessions count everywhere). No gym filter
+// (undefined) means compare across all gyms.
+function matchesGym(s: WorkoutSession, gym?: string): boolean {
+  return !gym || !s.gym || s.gym === gym;
+}
+
 /** Best completed weight and e1RM for an exercise across saved sessions. */
-function bestFor(sessions: WorkoutSession[], exerciseId: string) {
+function bestFor(sessions: WorkoutSession[], exerciseId: string, gym?: string) {
   let weight = 0;
   let e1rm = 0;
   for (const s of sessions) {
-    if (!s.endedAt) continue;
+    if (!s.endedAt || !matchesGym(s, gym)) continue;
     for (const we of s.exercises) {
       if (we.exerciseId !== exerciseId) continue;
       for (const set of we.sets) {
@@ -100,10 +114,11 @@ function bestFor(sessions: WorkoutSession[], exerciseId: string) {
 /** Last saved session containing an exercise — powers the Previous column. */
 export function previousSets(
   sessions: WorkoutSession[],
-  exerciseId: string
+  exerciseId: string,
+  gym?: string
 ): SetEntry[] {
   const sorted = [...sessions]
-    .filter((s) => s.endedAt)
+    .filter((s) => s.endedAt && matchesGym(s, gym))
     .sort((a, b) => b.date.localeCompare(a.date));
   for (const s of sorted) {
     const we = s.exercises.find((e) => e.exerciseId === exerciseId);
@@ -126,13 +141,15 @@ export const useWorkoutStore = create<WorkoutState>()(
       active: null,
       restTimer: null,
       lastPR: null,
+      gyms: ["LMU Gym", "LA Fitness"],
+      currentGym: "LMU Gym",
 
       startWorkout: (routine) => {
         if (get().active) return;
-        const { sessions } = get();
+        const { sessions, currentGym } = get();
         const exercises: WorkoutExercise[] = (routine?.exercises ?? []).map(
           (re) => {
-            const prev = previousSets(sessions, re.exerciseId);
+            const prev = previousSets(sessions, re.exerciseId, currentGym);
             return {
               id: newId(),
               exerciseId: re.exerciseId,
@@ -155,6 +172,7 @@ export const useWorkoutStore = create<WorkoutState>()(
             endedAt: null,
             exercises,
             cardio: [],
+            gym: currentGym,
           },
         });
       },
@@ -209,7 +227,7 @@ export const useWorkoutStore = create<WorkoutState>()(
       addExerciseToActive: (exerciseId) =>
         set((s) => {
           if (!s.active) return s;
-          const prev = previousSets(s.sessions, exerciseId);
+          const prev = previousSets(s.sessions, exerciseId, s.active.gym);
           return {
             active: {
               ...s.active,
@@ -333,7 +351,7 @@ export const useWorkoutStore = create<WorkoutState>()(
           state.updateSet(weId, setId, { completed: false, pr: false });
           return;
         }
-        const best = bestFor(state.sessions, we.exerciseId);
+        const best = bestFor(state.sessions, we.exerciseId, state.active.gym);
         const newE1rm = estimate1RM(target.weight, target.reps);
         const pr =
           target.weight > 0 &&
@@ -385,6 +403,22 @@ export const useWorkoutStore = create<WorkoutState>()(
         ),
 
       clearRest: () => set({ restTimer: null }),
+
+      addGym: (name) =>
+        set((s) => {
+          const n = name.trim();
+          if (!n || s.gyms.includes(n)) return { currentGym: n || s.currentGym };
+          return { gyms: [...s.gyms, n], currentGym: n };
+        }),
+
+      setCurrentGym: (name) => set({ currentGym: name }),
+
+      // Change the in-progress session's gym (and remember it as the default).
+      setActiveGym: (name) =>
+        set((s) => ({
+          currentGym: name,
+          active: s.active ? { ...s.active, gym: name } : s.active,
+        })),
 
       addCardio: (entry) =>
         set((s) =>
@@ -468,6 +502,8 @@ export const useWorkoutStore = create<WorkoutState>()(
         manualGymDays: s.manualGymDays,
         active: s.active,
         restTimer: s.restTimer,
+        gyms: s.gyms,
+        currentGym: s.currentGym,
       }),
     }
   )
