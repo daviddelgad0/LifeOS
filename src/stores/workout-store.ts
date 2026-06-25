@@ -223,8 +223,10 @@ export const useWorkoutStore = create<WorkoutState>()(
                     { length: Math.max(prev.length, 3) },
                     (_, i) => ({
                       id: newId(),
-                      weight: prev[i]?.weight ?? 0,
-                      reps: prev[i]?.reps ?? 8,
+                      // Autofill from last session; extra sets fall back to the
+                      // last logged set so weights/reps carry over, not reset.
+                      weight: prev[i]?.weight ?? prev[prev.length - 1]?.weight ?? 0,
+                      reps: prev[i]?.reps ?? prev[prev.length - 1]?.reps ?? 8,
                       rir: null,
                       completed: false,
                     })
