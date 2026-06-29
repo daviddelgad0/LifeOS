@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Camera, Plus, Ruler, TrendingDown, Trash2 } from "lucide-react";
+import { Camera, Plus, Ruler, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { AXIS, ChartBox, TOOLTIP_STYLE } from "@/components/gym/chart-box";
 import { MeasurementDialog } from "@/components/gym/measurement-dialog";
+import { PhotoCalendar } from "@/components/gym/photo-calendar";
 import { bodyReport } from "@/lib/body";
 import { formatShort, todayISO } from "@/lib/dates";
 import {
@@ -97,11 +98,6 @@ export function GymBodyTab() {
     await deletePhoto(id);
     await reload();
   };
-
-  const posed = photos.filter((p) => p.pose === pose);
-  const then = posed.at(-1);
-  const now = posed[0];
-  const showCompare = posed.length >= 2 && then && now && then.id !== now.id;
 
   // ── Charts ──────────────────────────────────────────────────────────────
   const weightData = measurements
@@ -247,43 +243,13 @@ export function GymBodyTab() {
           />
         </div>
 
-        {showCompare && (
-          <div className="grid grid-cols-2 gap-2">
-            <Compare label={`Then · ${formatShort(then!.date)}`} url={then!.url} onClick={() => setViewing(then!.url)} />
-            <Compare label={`Now · ${formatShort(now!.date)}`} url={now!.url} onClick={() => setViewing(now!.url)} />
-          </div>
-        )}
-
         {photos.length === 0 ? (
           <p className="py-4 text-center text-sm text-text-tertiary">
             No photos yet. Same spot, same light, every couple weeks — that&apos;s
             where the real progress shows.
           </p>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {photos.map((p) => (
-              <div key={p.id} className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.url}
-                  alt={`${p.pose} ${p.date}`}
-                  className="size-full cursor-pointer object-cover"
-                  onClick={() => setViewing(p.url)}
-                />
-                <span className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1 text-[0.6rem] capitalize text-white">
-                  {p.pose} · {formatShort(p.date)}
-                </span>
-                <button
-                  type="button"
-                  aria-label="Delete photo"
-                  onClick={() => remove(p.id)}
-                  className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  <Trash2 className="size-3" />
-                </button>
-              </div>
-            ))}
-          </div>
+          <PhotoCalendar photos={photos} onDelete={remove} onView={setViewing} />
         )}
       </section>
 
@@ -332,17 +298,6 @@ function Snapshot({
   );
 }
 
-function Compare({ label, url, onClick }: { label: string; url: string; onClick: () => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[0.65rem] text-text-tertiary">{label}</span>
-      <div className="aspect-[3/4] overflow-hidden rounded-lg border border-border">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={label} onClick={onClick} className="size-full cursor-pointer object-cover" />
-      </div>
-    </div>
-  );
-}
 
 function TrendChart({
   title,
