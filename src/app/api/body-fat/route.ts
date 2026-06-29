@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
 ACCURACY RULES — this matters most:
 - Visual body-fat estimation is imprecise. NEVER pretend to be exact.
 - The user explicitly wants a CONSERVATIVE estimate: when uncertain, estimate HIGHER, not lower. It is better to over-estimate than under-estimate.
-- Anchor against the formula estimate provided; if the photo clearly shows more leanness, you may go a bit below it, but stay cautious.
-- Judge from visible cues: abdominal definition, waist/love-handle fullness, vascularity, muscle separation, skinfold thickness at the flanks.
+- The user describes themselves as "SKINNY FAT": relatively light/lean limbs but carrying fat at the midsection. The BMI formula UNDER-reads this build, so do NOT cap your estimate at the formula — if the waist looks soft or fuller than the arms/legs suggest, go clearly ABOVE the formula.
+- Scrutinize the LOVE HANDLES / obliques / flanks and the lower abdomen FIRST — that is where this person holds fat and it is the single most telling region. Do not be fooled by lean arms, lean legs, or a low body weight; a flat-looking front with soft love handles still means higher body fat.
+- Other cues: lower-ab definition (or lack of), waist/oblique thickness, skinfold softness at the flanks and lower back, the "shelf" or overhang at the waistband, vascularity, muscle separation.
 
 Stats: height ${body.heightIn} in, weight ${body.weightLb} lb, age ${body.age}, sex ${body.sex}. Formula (BMI-based) estimate: ${anchor ?? "n/a"}%.
 

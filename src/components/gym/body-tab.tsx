@@ -157,6 +157,8 @@ export function GymBodyTab() {
     date: formatShort(p.date),
     value: p.value,
   }));
+  // date → body-fat % so the photo calendar can show it alongside the photos.
+  const bfByDate = new Map(report.bfSeries.map((p) => [p.date, p.value]));
 
   const fmtDelta = (n: number | null, unit: string) =>
     n == null ? "" : `${n > 0 ? "+" : ""}${n}${unit}`;
@@ -354,7 +356,12 @@ export function GymBodyTab() {
             where the real progress shows.
           </p>
         ) : (
-          <PhotoCalendar photos={photos} onDelete={remove} onView={setViewing} />
+          <PhotoCalendar
+            photos={photos}
+            onDelete={remove}
+            onView={setViewing}
+            bfByDate={bfByDate}
+          />
         )}
       </section>
 

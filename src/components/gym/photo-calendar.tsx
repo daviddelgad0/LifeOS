@@ -23,10 +23,13 @@ export function PhotoCalendar({
   photos,
   onDelete,
   onView,
+  bfByDate,
 }: {
   photos: Loaded[];
   onDelete: (id: string) => void;
   onView: (url: string) => void;
+  /** date (YYYY-MM-DD) → body-fat % (logged or estimated) for that day. */
+  bfByDate?: Map<string, number>;
 }) {
   const now = new Date();
   const [cursor, setCursor] = useState(() => ({ y: now.getFullYear(), m: now.getMonth() }));
@@ -116,7 +119,14 @@ export function PhotoCalendar({
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{selected && formatShort(selected)}</DialogTitle>
+            <DialogTitle>
+              {selected && formatShort(selected)}
+              {selected && bfByDate?.has(selected) && (
+                <span className="ml-2 text-sm font-normal text-accent">
+                  ~{bfByDate.get(selected)}% body fat
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2">
             {dayPhotos.map((p) => (
