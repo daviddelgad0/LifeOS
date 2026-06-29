@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Camera, Plus, Ruler, TrendingDown } from "lucide-react";
+import { Camera, Plus, Ruler, Sparkles, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { AXIS, ChartBox, TOOLTIP_STYLE } from "@/components/gym/chart-box";
 import { MeasurementDialog } from "@/components/gym/measurement-dialog";
 import { PhotoCalendar } from "@/components/gym/photo-calendar";
 import { bodyReport } from "@/lib/body";
+import { parseSex } from "@/lib/strength";
 import { formatShort, todayISO } from "@/lib/dates";
 import {
   addPhoto,
@@ -53,6 +54,16 @@ export function GymBodyTab() {
   const [viewing, setViewing] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const urlsRef = useRef<string[]>([]);
+
+  const estFileRef = useRef<HTMLInputElement>(null);
+  const [bfBusy, setBfBusy] = useState(false);
+  const [bfEst, setBfEst] = useState<{
+    estimate: number;
+    low: number;
+    high: number;
+    rationale: string;
+    anchor: number | null;
+  } | null>(null);
 
   const heightIn = parseFloat(profile.heightIn) || 0;
   const report = bodyReport(measurements, heightIn, profile.sex, goalWeightLb);
@@ -97,6 +108,44 @@ export function GymBodyTab() {
   const remove = async (id: string) => {
     await deletePhoto(id);
     await reload();
+  };
+
+  // ── AI body-fat estimate from a photo ──────────────────────────────────────
+  const onEstimate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBfBusy(true);
+    setBfEst(null);
+    try {
+      const blob = await compressImage(file, 1024, 0.75);
+      const imageBase64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onloadend = () => res(String(r.result).split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(blob);
+      });
+      const weightLb = report.latestWeight ?? (parseFloat(profile.weightLb) || 0);
+      const resp = await fetch("/api/body-fat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64,
+          mediaType: "image/jpeg",
+          heightIn,
+          weightLb,
+          age: parseInt(profile.age) || 0,
+          sex: parseSex(profile.sex),
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error();
+      setBfEst(data);
+    } catch {
+      toast.error("Couldn't estimate from that photo");
+    } finally {
+      setBfBusy(false);
+    }
   };
 
   // ── Charts ──────────────────────────────────────────────────────────────
@@ -185,6 +234,62 @@ export function GymBodyTab() {
           <p className="text-xs text-text-tertiary">
             Set a goal weight in Settings → Profile for a projection.
           </p>
+        )}
+      </section>
+
+      {/* AI body-fat estimate from a photo */}
+      <section className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+        <h2 className="flex items-center gap-2 text-sm font-medium text-text-tertiary">
+          <Sparkles className="size-3.5" /> Body-fat estimate from a photo
+        </h2>
+        <p className="text-xs text-text-tertiary">
+          A rough AI read from your height, weight, and a photo — it leans high
+          on purpose. An estimate, not a measurement. The photo is sent to
+          Claude for this (unlike your saved photos, which stay on your device).
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="self-start"
+          disabled={bfBusy}
+          onClick={() => estFileRef.current?.click()}
+        >
+          <Sparkles data-icon="inline-start" className="size-3.5" />
+          {bfBusy ? "Analyzing…" : "Estimate from photo"}
+        </Button>
+        <input
+          ref={estFileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onEstimate}
+        />
+        {bfEst && (
+          <div className="flex flex-col gap-2 rounded-lg border border-accent-border bg-accent-dim/40 p-3">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="font-mono text-3xl font-semibold text-accent">
+                ~{bfEst.estimate}%
+              </span>
+              <span className="text-xs text-text-tertiary">
+                likely {bfEst.low}–{bfEst.high}%
+                {bfEst.anchor ? ` · BMI formula ${bfEst.anchor}%` : ""}
+              </span>
+            </div>
+            <p className="text-sm text-text-secondary">{bfEst.rationale}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={() => {
+                logMeasurement({ date: todayISO(), bodyFat: bfEst.estimate });
+                toast.success("Logged", {
+                  description: `Body fat ${bfEst.estimate}% for today`,
+                });
+              }}
+            >
+              Log {bfEst.estimate}% for today
+            </Button>
+          </div>
         )}
       </section>
 
