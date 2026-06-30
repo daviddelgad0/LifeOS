@@ -12,6 +12,9 @@ export interface ProgressPhoto {
   pose: Pose;
   blob: Blob;
   createdAt: number;
+  /** Auto body-fat estimate cached on the photo so it runs once, not per view. */
+  bodyFat?: number;
+  bfNote?: string;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -62,6 +65,27 @@ export async function deletePhoto(id: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+/** Cache the auto body-fat estimate onto a photo so it isn't re-run each view. */
+export async function setPhotoBodyFat(
+  id: string,
+  bodyFat: number,
+  bfNote?: string
+): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const photo = req.result as ProgressPhoto | undefined;
+      if (photo) store.put({ ...photo, bodyFat, bfNote });
+    };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

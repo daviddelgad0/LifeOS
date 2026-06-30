@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Camera, Plus, Ruler, Sparkles, TrendingDown } from "lucide-react";
+import { Camera, Plus, Ruler, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   compressImage,
   deletePhoto,
   getPhotos,
+  setPhotoBodyFat,
   type Pose,
   type ProgressPhoto,
 } from "@/lib/photo-store";
@@ -55,15 +56,8 @@ export function GymBodyTab() {
   const fileRef = useRef<HTMLInputElement>(null);
   const urlsRef = useRef<string[]>([]);
 
-  const estFileRef = useRef<HTMLInputElement>(null);
   const [bfBusy, setBfBusy] = useState(false);
-  const [bfEst, setBfEst] = useState<{
-    estimate: number;
-    low: number;
-    high: number;
-    rationale: string;
-    anchor: number | null;
-  } | null>(null);
+  const estimatingRef = useRef<string | null>(null);
 
   const heightIn = parseFloat(profile.heightIn) || 0;
   const report = bodyReport(measurements, heightIn, profile.sex, goalWeightLb);
@@ -110,43 +104,55 @@ export function GymBodyTab() {
     await reload();
   };
 
-  // ── AI body-fat estimate from a photo ──────────────────────────────────────
-  const onEstimate = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setBfBusy(true);
-    setBfEst(null);
-    try {
-      const blob = await compressImage(file, 1024, 0.75);
-      const imageBase64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onloadend = () => res(String(r.result).split(",")[1]);
-        r.onerror = rej;
-        r.readAsDataURL(blob);
-      });
-      const weightLb = report.latestWeight ?? (parseFloat(profile.weightLb) || 0);
-      const resp = await fetch("/api/body-fat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64,
-          mediaType: "image/jpeg",
-          heightIn,
-          weightLb,
-          age: parseInt(profile.age) || 0,
-          sex: parseSex(profile.sex),
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok || data.error) throw new Error();
-      setBfEst(data);
-    } catch {
-      toast.error("Couldn't estimate from that photo");
-    } finally {
-      setBfBusy(false);
-    }
-  };
+  // ── Automatic body-fat estimate from the latest photo ──────────────────────
+  const weightForEst = report.latestWeight ?? (parseFloat(profile.weightLb) || 0);
+  const autoEstimate = useCallback(
+    async (photo: Loaded) => {
+      setBfBusy(true);
+      try {
+        const imageBase64 = await new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onloadend = () => res(String(r.result).split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(photo.blob);
+        });
+        const resp = await fetch("/api/body-fat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64,
+            mediaType: photo.blob.type || "image/jpeg",
+            heightIn,
+            weightLb: weightForEst,
+            age: parseInt(profile.age) || 0,
+            sex: parseSex(profile.sex),
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) throw new Error();
+        await setPhotoBodyFat(photo.id, data.estimate, data.rationale);
+        await reload();
+      } catch {
+        // Silent — the snapshot just falls back to the formula estimate.
+      } finally {
+        setBfBusy(false);
+      }
+    },
+    [heightIn, weightForEst, profile.age, profile.sex, reload]
+  );
+
+  // Estimate the newest photo once (cached on the photo afterward).
+  useEffect(() => {
+    const latest = photos[0];
+    if (!latest || latest.bodyFat !== undefined) return;
+    if (estimatingRef.current === latest.id) return;
+    estimatingRef.current = latest.id;
+    autoEstimate(latest).finally(() => {
+      estimatingRef.current = null;
+    });
+  }, [photos, autoEstimate]);
+
+  const photoBf = photos[0]?.bodyFat ?? null;
 
   // ── Charts ──────────────────────────────────────────────────────────────
   const weightData = measurements
@@ -159,6 +165,8 @@ export function GymBodyTab() {
   }));
   // date → body-fat % so the photo calendar can show it alongside the photos.
   const bfByDate = new Map(report.bfSeries.map((p) => [p.date, p.value]));
+  // A photo's own estimate takes precedence on its date.
+  for (const p of photos) if (p.bodyFat != null) bfByDate.set(p.date, p.bodyFat);
 
   const fmtDelta = (n: number | null, unit: string) =>
     n == null ? "" : `${n > 0 ? "+" : ""}${n}${unit}`;
@@ -186,9 +194,17 @@ export function GymBodyTab() {
         />
         <Snapshot
           label="Est. body fat"
-          value={report.bodyFat}
+          value={photoBf ?? report.bodyFat}
           suffix="%"
-          sub={heightIn ? "RFM estimate" : "add height in Settings"}
+          sub={
+            photoBf != null
+              ? "from your latest photo"
+              : bfBusy
+                ? "reading your photo…"
+                : heightIn
+                  ? "RFM estimate"
+                  : "add height in Settings"
+          }
         />
         <Snapshot
           label="Waist"
@@ -197,6 +213,14 @@ export function GymBodyTab() {
           sub={report.waistDelta != null ? `${fmtDelta(report.waistDelta, '"')} total` : "log waist"}
         />
       </section>
+
+      {photoBf != null || bfBusy ? (
+        <p className="-mt-4 text-[0.65rem] text-text-tertiary">
+          Body fat is auto-estimated from your newest photo (sent to Claude for
+          the read; your saved photos stay on device). It leans high and weights
+          your love handles — an estimate, not a measurement.
+        </p>
+      ) : null}
 
       {/* Estimates */}
       <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4">
@@ -236,62 +260,6 @@ export function GymBodyTab() {
           <p className="text-xs text-text-tertiary">
             Set a goal weight in Settings → Profile for a projection.
           </p>
-        )}
-      </section>
-
-      {/* AI body-fat estimate from a photo */}
-      <section className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
-        <h2 className="flex items-center gap-2 text-sm font-medium text-text-tertiary">
-          <Sparkles className="size-3.5" /> Body-fat estimate from a photo
-        </h2>
-        <p className="text-xs text-text-tertiary">
-          A rough AI read from your height, weight, and a photo — it leans high
-          on purpose. An estimate, not a measurement. The photo is sent to
-          Claude for this (unlike your saved photos, which stay on your device).
-        </p>
-        <Button
-          size="sm"
-          variant="outline"
-          className="self-start"
-          disabled={bfBusy}
-          onClick={() => estFileRef.current?.click()}
-        >
-          <Sparkles data-icon="inline-start" className="size-3.5" />
-          {bfBusy ? "Analyzing…" : "Estimate from photo"}
-        </Button>
-        <input
-          ref={estFileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={onEstimate}
-        />
-        {bfEst && (
-          <div className="flex flex-col gap-2 rounded-lg border border-accent-border bg-accent-dim/40 p-3">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="font-mono text-3xl font-semibold text-accent">
-                ~{bfEst.estimate}%
-              </span>
-              <span className="text-xs text-text-tertiary">
-                likely {bfEst.low}–{bfEst.high}%
-                {bfEst.anchor ? ` · BMI formula ${bfEst.anchor}%` : ""}
-              </span>
-            </div>
-            <p className="text-sm text-text-secondary">{bfEst.rationale}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => {
-                logMeasurement({ date: todayISO(), bodyFat: bfEst.estimate });
-                toast.success("Logged", {
-                  description: `Body fat ${bfEst.estimate}% for today`,
-                });
-              }}
-            >
-              Log {bfEst.estimate}% for today
-            </Button>
-          </div>
         )}
       </section>
 
