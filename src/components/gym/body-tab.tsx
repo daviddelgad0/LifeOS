@@ -141,13 +141,13 @@ export function GymBodyTab() {
     [heightIn, weightForEst, profile.age, profile.sex, reload]
   );
 
-  // Estimate the newest photo once (cached on the photo afterward).
+  // Backfill any photo without an estimate, newest first, one at a time
+  // (each is cached on its record, so this runs once per photo total).
   useEffect(() => {
-    const latest = photos[0];
-    if (!latest || latest.bodyFat !== undefined) return;
-    if (estimatingRef.current === latest.id) return;
-    estimatingRef.current = latest.id;
-    autoEstimate(latest).finally(() => {
+    const pending = photos.find((p) => p.bodyFat === undefined);
+    if (!pending || estimatingRef.current === pending.id) return;
+    estimatingRef.current = pending.id;
+    autoEstimate(pending).finally(() => {
       estimatingRef.current = null;
     });
   }, [photos, autoEstimate]);
