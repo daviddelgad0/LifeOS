@@ -8,6 +8,15 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme="dark"
       className="toaster group"
+      // Sonner's own internal stacking/height measurement for toasts beyond
+      // the front one is unreliable in this version — two toasts firing
+      // together (e.g. "+XP" and an achievement unlock on finishing your
+      // first workout) can leave a second toast rendered with a wildly
+      // oversized height, showing as a large empty dark box over the page.
+      // Capping to 1 visible toast keeps the rest queued (opacity: 0, not
+      // rendered visibly) until the front one dismisses, avoiding that path
+      // entirely — this is a common real scenario, not an edge case.
+      visibleToasts={1}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
