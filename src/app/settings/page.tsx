@@ -29,6 +29,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
 import { useWorkoutStore } from "@/stores/workout-store";
+import { toDisplayWeight, toStoredWeight } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
 const PERSONALITIES: { id: CoachPersonality; label: string; blurb: string }[] = [
@@ -271,12 +272,17 @@ export default function SettingsPage() {
           />
         </label>
         <div className="flex items-center justify-between text-sm">
-          <span>Goal weight (lb)</span>
+          <span>Goal weight ({app.units})</span>
           <Input
             type="number"
             inputMode="numeric"
-            value={app.goalWeightLb}
-            onChange={(e) => app.set("goalWeightLb", Number(e.target.value) || 0)}
+            value={toDisplayWeight(app.goalWeightLb, app.units)}
+            onChange={(e) =>
+              app.set(
+                "goalWeightLb",
+                toStoredWeight(Number(e.target.value) || 0, app.units)
+              )
+            }
             className="h-9 w-20 text-right font-mono"
           />
         </div>

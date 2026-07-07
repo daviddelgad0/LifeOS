@@ -193,7 +193,7 @@ export function ClassesTab() {
               Drop a syllabus PDF or image, or tap to browse
             </p>
             <p className="text-xs text-text-tertiary">
-              v1 uses mock parsing — you review everything before it saves
+              Parsed by Claude — you review everything before it saves
             </p>
           </button>
         )}
