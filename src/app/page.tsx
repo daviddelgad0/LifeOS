@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, type Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -17,18 +17,22 @@ import { useAppStore } from "@/stores/app-store";
 import { useTaskStore } from "@/stores/task-store";
 import { useWorkoutStore } from "@/stores/workout-store";
 
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-};
-const item: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: "tween", ease: "easeOut", duration: 0.4 },
-  },
-};
+// Each element owns its own initial/animate/transition instead of inheriting
+// from a parent's variants + staggerChildren — that Context-based propagation
+// can leave a child stuck at "hidden" if interrupted mid-flight.
+//
+// Deliberately does NOT animate opacity: a viewport resize while this
+// animation is in flight (confirmed via testing — the same kind of event a
+// phone fires when the keyboard opens/closes or Safari's toolbar collapses
+// on scroll) can freeze framer-motion's driver at a partial frame forever.
+// If opacity were animated, that freeze would leave real content invisible.
+// Animating only `y` means a frozen frame just leaves content a few pixels
+// off from its resting position — fully visible and readable either way.
+const fadeUp = (delaySeconds: number) => ({
+  initial: { y: 12 },
+  animate: { y: 0 },
+  transition: { type: "tween" as const, ease: "easeOut" as const, duration: 0.4, delay: delaySeconds },
+});
 
 function greeting(name: string): string {
   const h = new Date().getHours();
@@ -88,19 +92,14 @@ export default function TodayPage() {
   const linecap = ringStyle === "flat" ? ("butt" as const) : ("round" as const);
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6 md:px-6 md:py-8"
-    >
-      <motion.header variants={item} className="flex flex-col gap-1">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6 md:px-6 md:py-8">
+      <motion.header {...fadeUp(0)} className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{greeting(name)}</h1>
         <p className="text-sm text-text-tertiary">{formatLong(today)}</p>
       </motion.header>
 
       <motion.section
-        variants={item}
+        {...fadeUp(0.05)}
         className="flex items-center justify-around gap-2 rounded-xl border border-border bg-surface px-2 py-6 sm:justify-start sm:gap-12 sm:px-8"
       >
         <button
@@ -147,15 +146,15 @@ export default function TodayPage() {
         </button>
       </motion.section>
 
-      <motion.div variants={item}>
+      <motion.div {...fadeUp(0.1)}>
         <WhoopStrip />
       </motion.div>
 
-      <motion.div variants={item}>
+      <motion.div {...fadeUp(0.15)}>
         <EnergyCard />
       </motion.div>
 
-      <motion.section variants={item} className="flex flex-col gap-3">
+      <motion.section {...fadeUp(0.2)} className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-text-tertiary">Today</h2>
         {dueToday.length === 0 ? (
           <EmptyState
@@ -182,7 +181,7 @@ export default function TodayPage() {
       </motion.section>
 
       {upNext.length > 0 && (
-        <motion.section variants={item} className="flex flex-col gap-3">
+        <motion.section {...fadeUp(0.25)} className="flex flex-col gap-3">
           <h2 className="text-sm font-medium text-text-tertiary">Up next</h2>
           <div className="flex flex-col gap-4">
             {upNext.map((group) => (
@@ -215,6 +214,6 @@ export default function TodayPage() {
       </button>
 
       <QuickAddTask open={addOpen} onOpenChange={setAddOpen} />
-    </motion.div>
+    </div>
   );
 }

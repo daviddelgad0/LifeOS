@@ -44,7 +44,9 @@ export default function GymPage() {
         <h1 className="text-2xl font-semibold">Gym</h1>
         <Select value={tab} onValueChange={(v) => v && setTab(v)}>
           <SelectTrigger className="w-40" aria-label="Gym section">
-            <SelectValue />
+            <SelectValue>
+              {(v: string) => TABS.find((t) => t.id === v)?.label ?? v}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {TABS.map((t) => (
