@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 
 import { todayISO } from "@/lib/dates";
 import { estimate1RM } from "@/lib/fitness";
+import { suggestNextSet, type WhoopContext } from "@/lib/progression";
 import { dayStreak } from "@/lib/streaks";
 import { XP } from "@/lib/xp";
 import {
@@ -22,6 +23,7 @@ import type {
   WorkoutSession,
 } from "@/lib/types";
 import { useAppStore } from "./app-store";
+import { useWhoopStore } from "./whoop-store";
 
 export interface RestTimer {
   endsAt: number;
@@ -146,21 +148,58 @@ export const useWorkoutStore = create<WorkoutState>()(
 
       startWorkout: (routine) => {
         if (get().active) return;
-        const { sessions, currentGym } = get();
+        const { sessions, currentGym, customExercises } = get();
+        const units = useAppStore.getState().units;
+        const whoopState = useWhoopStore.getState();
+        const whoop: WhoopContext = {
+          connected: whoopState.connected,
+          days: whoopState.days.map((d) => ({
+            date: d.date,
+            recovery: d.recovery,
+          })),
+        };
+        const today = todayISO();
         const exercises: WorkoutExercise[] = (routine?.exercises ?? []).map(
           (re) => {
             const prev = previousSets(sessions, re.exerciseId, currentGym);
+            const suggestion = suggestNextSet({
+              sessions,
+              active: null,
+              exerciseId: re.exerciseId,
+              setIndex: 0,
+              gym: currentGym,
+              routineTarget: { targetReps: re.targetReps },
+              customExercises,
+              units,
+              whoop,
+              todayISO: today,
+            });
             return {
               id: newId(),
               exerciseId: re.exerciseId,
               restSeconds: re.restSeconds,
-              sets: Array.from({ length: re.targetSets }, (_, i) => ({
-                id: newId(),
-                weight: prev[i]?.weight ?? prev[prev.length - 1]?.weight ?? 0,
-                reps: prev[i]?.reps ?? re.targetReps,
-                rir: null,
-                completed: false,
-              })),
+              sets: Array.from({ length: re.targetSets }, (_, i) => {
+                if (
+                  suggestion?.kind === "progress" ||
+                  suggestion?.kind === "deload" ||
+                  suggestion?.kind === "calibrate"
+                ) {
+                  return {
+                    id: newId(),
+                    weight: suggestion.weightLb,
+                    reps: suggestion.repsLo,
+                    rir: null,
+                    completed: false,
+                  };
+                }
+                const weight = prev[i]?.weight ?? prev[prev.length - 1]?.weight ?? 0;
+                const prevReps = prev[i]?.reps ?? re.targetReps;
+                const reps =
+                  suggestion?.kind === "hold"
+                    ? Math.min(prevReps + 1, suggestion.repsHi)
+                    : prevReps;
+                return { id: newId(), weight, reps, rir: null, completed: false };
+              }),
             };
           }
         );

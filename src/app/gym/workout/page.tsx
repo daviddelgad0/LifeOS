@@ -50,9 +50,12 @@ import {
   sessionDurationMin,
   sessionVolume,
 } from "@/lib/fitness";
+import { suggestNextSet, type SetSuggestion, type WhoopContext } from "@/lib/progression";
+import { todayISO } from "@/lib/dates";
 import type { CardioEntry, Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
 import { previousSets, useWorkoutStore } from "@/stores/workout-store";
 import { useAppStore } from "@/stores/app-store";
+import { useWhoopStore } from "@/stores/whoop-store";
 import { toDisplayWeight, toDisplayTotal } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
@@ -224,6 +227,9 @@ export default function ActiveWorkoutPage() {
   const updateCardio = useWorkoutStore((s) => s.updateCardio);
   const removeCardio = useWorkoutStore((s) => s.removeCardio);
   const units = useAppStore((s) => s.units);
+  const currentGym = useWorkoutStore((s) => s.currentGym);
+  const whoopConnected = useWhoopStore((s) => s.connected);
+  const whoopDays = useWhoopStore((s) => s.days);
 
   const [editor, setEditor] = useState<SetEditorTarget | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -244,6 +250,35 @@ export default function ActiveWorkoutPage() {
     }
     return map;
   }, [active, sessions]);
+
+  const suggestionByExercise = useMemo(() => {
+    const map = new Map<string, SetSuggestion | null>();
+    if (!active) return map;
+    const whoop: WhoopContext = {
+      connected: whoopConnected,
+      days: whoopDays.map((d) => ({ date: d.date, recovery: d.recovery })),
+    };
+    const today = todayISO();
+    for (const we of active.exercises) {
+      const firstUncompleted = we.sets.findIndex((s) => !s.completed);
+      if (firstUncompleted === -1) continue;
+      map.set(
+        we.exerciseId,
+        suggestNextSet({
+          sessions,
+          active,
+          exerciseId: we.exerciseId,
+          setIndex: firstUncompleted,
+          gym: active.gym ?? currentGym,
+          customExercises,
+          units,
+          whoop,
+          todayISO: today,
+        })
+      );
+    }
+    return map;
+  }, [active, sessions, customExercises, units, currentGym, whoopConnected, whoopDays]);
 
   const volume = active ? sessionVolume(active) : 0;
   const volumeDisplay = toDisplayTotal(volume, units);
@@ -281,6 +316,12 @@ export default function ActiveWorkoutPage() {
         .filter((m): m is Muscle => !!m)
     ),
   ];
+  const editorExercise = editor
+    ? active.exercises.find((w) => w.id === editor.weId)
+    : undefined;
+  const editorSuggestion = editorExercise
+    ? suggestionByExercise.get(editorExercise.exerciseId) ?? null
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col pb-40">
@@ -348,6 +389,8 @@ export default function ActiveWorkoutPage() {
               s.completed && s.weight * s.reps > best.weight * best.reps ? s : best,
             { weight: 0, reps: 0 } as Pick<SetEntry, "weight" | "reps">
           );
+          const suggestion = suggestionByExercise.get(we.exerciseId) ?? null;
+          const firstUncompleted = we.sets.find((s) => !s.completed);
           return (
             <section
               key={we.id}
@@ -409,6 +452,33 @@ export default function ActiveWorkoutPage() {
                   </DropdownMenu>
                 </div>
               </div>
+
+              {suggestion && firstUncompleted && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-accent-border bg-accent-dim px-3 py-2">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-mono text-xs text-accent">
+                      Next: {toDisplayWeight(suggestion.weightLb, units)} {units} ×{" "}
+                      {suggestion.repsLo}–{suggestion.repsHi} @ {suggestion.targetRir} RIR
+                    </span>
+                    <span className="truncate text-xs text-text-tertiary">
+                      {suggestion.reason}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() =>
+                      updateSet(we.id, firstUncompleted.id, {
+                        weight: suggestion.weightLb,
+                        reps: suggestion.repsLo,
+                      })
+                    }
+                  >
+                    Apply
+                  </Button>
+                </div>
+              )}
 
               <div className="grid grid-cols-[1.5rem_3.5rem_1fr_1fr_2.75rem_2.75rem] gap-2 text-center text-[0.65rem] text-text-tertiary">
                 <span>set</span>
@@ -527,6 +597,7 @@ export default function ActiveWorkoutPage() {
 
       <SetEditorSheet
         target={editor}
+        suggestion={editorSuggestion}
         onClose={() => setEditor(null)}
         onCommit={(patch) => {
           if (editor) updateSet(editor.weId, editor.setId, patch);

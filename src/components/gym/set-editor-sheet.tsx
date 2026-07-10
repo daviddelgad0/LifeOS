@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { barWeight, plateBreakdown, warmupSets } from "@/lib/fitness";
+import type { SetSuggestion } from "@/lib/progression";
 import { toDisplayWeight, toStoredWeight, weightStep } from "@/lib/units";
 import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export interface SetEditorTarget {
 
 interface SetEditorSheetProps {
   target: SetEditorTarget | null;
+  suggestion?: SetSuggestion | null;
   onClose: () => void;
   onCommit: (patch: {
     weight?: number;
@@ -44,7 +46,12 @@ const FIELD_LABEL = {
   note: "Set note",
 } as const;
 
-export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProps) {
+export function SetEditorSheet({
+  target,
+  suggestion,
+  onClose,
+  onCommit,
+}: SetEditorSheetProps) {
   const units = useAppStore((s) => s.units);
   const [value, setValue] = useState(0);
   const [note, setNote] = useState("");
@@ -120,6 +127,15 @@ export function SetEditorSheet({ target, onClose, onCommit }: SetEditorSheetProp
               unit={target.field === "weight" ? units : "reps"}
               aria-label={FIELD_LABEL[target.field]}
             />
+          )}
+
+          {target.field === "weight" && suggestion && (
+            <p className="text-xs text-text-tertiary">
+              Suggested: {toDisplayWeight(suggestion.weightLb, units)} {units} ×{" "}
+              {suggestion.repsLo}–{suggestion.repsHi} @ {suggestion.targetRir} RIR
+              {" — "}
+              {suggestion.reason}
+            </p>
           )}
 
           {target.field === "weight" && (
