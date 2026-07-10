@@ -142,14 +142,13 @@ function progressStepDisplay(
 }
 
 // ── rep range ────────────────────────────────────────────────────────────
-function repRangeFor(
-  exercise: Exercise | undefined,
-  routineTarget: { targetReps: number } | undefined
-): { lo: number; hi: number } {
-  if (routineTarget) {
-    return { lo: Math.max(3, routineTarget.targetReps - 2), hi: routineTarget.targetReps + 2 };
-  }
-  switch (exercise?.equipment) {
+// Evidence-based hypertrophy range by movement pattern. Takes priority over
+// a routine's raw targetReps: a routine number is just whatever was typed in
+// when the template was built, not a signal about the exercise itself — the
+// equipment class is. Barbell compounds get a lower/heavier band, bodyweight
+// movements tolerate a higher ceiling, everything else sits in the middle.
+function naturalRangeFor(exercise: Exercise): { lo: number; hi: number } {
+  switch (exercise.equipment) {
     case "barbell":
       return { lo: 6, hi: 10 };
     case "bodyweight":
@@ -157,6 +156,20 @@ function repRangeFor(
     default:
       return { lo: 8, hi: 12 }; // dumbbell, cable, machine, kettlebell
   }
+}
+
+function repRangeFor(
+  exercise: Exercise | undefined,
+  routineTarget: { targetReps: number } | undefined
+): { lo: number; hi: number } {
+  if (exercise) return naturalRangeFor(exercise);
+  // Exercise lookup failed (e.g. a deleted custom exercise) — no
+  // equipment-based profile to generate from, fall back to the routine's own
+  // number, or a generic default if there isn't even that.
+  if (routineTarget) {
+    return { lo: Math.max(3, routineTarget.targetReps - 2), hi: routineTarget.targetReps + 2 };
+  }
+  return { lo: 8, hi: 12 };
 }
 
 /** Completed sets per muscle in the week containing `todayISO`, incl. active. */
