@@ -376,7 +376,7 @@ export function suggestNextSet(args: {
     return {
       weightLb: lastWeightLb,
       repsLo: Math.min(lastBestReps + 1, hi),
-      repsHi: Math.min(lastBestReps + 1, hi),
+      repsHi: hi,
       targetRir,
       reason: `${reasonPrefix}${volumeReason}`,
       kind: "hold",
@@ -450,14 +450,19 @@ export function suggestNextSet(args: {
     }
   }
 
-  // Default: same weight, one more rep than last time.
+  // Default: same weight, climbing reps toward the top of the range — repsLo
+  // is the realistic next step, repsHi is the true range top (what triggers
+  // a weight jump once every set gets there).
   const reps = Math.min(lastBestReps + 1, hi);
   return {
     weightLb: lastWeightLb,
     repsLo: reps,
-    repsHi: reps,
+    repsHi: hi,
     targetRir,
-    reason: `${reasonPrefix}+1 rep over last time.`,
+    reason:
+      reps >= hi
+        ? `${reasonPrefix}At the top of your range — hit it again to trigger a weight jump.`
+        : `${reasonPrefix}+1 rep over last time — work up to ${hi} to trigger a jump.`,
     kind: "hold",
   };
 }
