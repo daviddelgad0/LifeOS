@@ -78,10 +78,13 @@ add `&& !s.warmup` in Phase 2 (it is listed there as a call site).
 
 ### 1b. New component `src/components/gym/muscle-body-map.tsx`
 
-Use this file **verbatim** — the SVG geometry below is pre-checked for
-overlaps and symmetry (front figure centered x=60, back figure x=180; delts
-drawn after the back/lat mass so they sit on top). Do not redraw or "improve"
-the shapes.
+Use this file **verbatim** — the SVG geometry below was rendered and
+visually verified (front figure centered x=60, back figure x=180; arms hang
+at ±12°, forearms at ±18°; silhouettes are composed from overlapping
+same-color primitives so joins are invisible). Muscle groups render with
+group-level `opacity` — NOT per-shape `fill-opacity` — so overlapping
+shapes inside one muscle composite as a single uniform mass. Do not redraw
+or "improve" the shapes.
 
 ```tsx
 "use client";
@@ -91,116 +94,162 @@ import type { Muscle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Shape =
-  | { k: "c"; cx: number; cy: number; r: number }
-  | { k: "r"; x: number; y: number; w: number; h: number; rx: number }
-  | { k: "p"; d: string };
+  | { k: "c"; cx: number; cy: number; r: number; t?: string }
+  | { k: "e"; cx: number; cy: number; rx: number; ry: number; t?: string }
+  | { k: "r"; x: number; y: number; w: number; h: number; rx: number; t?: string }
+  | { k: "p"; d: string; t?: string };
 
-// Neutral silhouette (head, neck, pelvis, hands, front shins, feet).
+// Body silhouettes: head, neck, torso, arms, hands, legs, feet.
 const NEUTRAL: Shape[] = [
-  // front figure
-  { k: "c", cx: 60, cy: 16, r: 9 },
-  { k: "r", x: 56, y: 24, w: 8, h: 7, rx: 2 },
-  { k: "r", x: 48, y: 76, w: 24, h: 10, rx: 4 },
-  { k: "c", cx: 34, cy: 93, r: 3.5 },
-  { k: "c", cx: 86, cy: 93, r: 3.5 },
-  { k: "r", x: 48.5, y: 126, w: 9, h: 30, rx: 4.5 },
-  { k: "r", x: 62.5, y: 126, w: 9, h: 30, rx: 4.5 },
-  { k: "r", x: 45, y: 158, w: 12, h: 5, rx: 2.5 },
-  { k: "r", x: 63, y: 158, w: 12, h: 5, rx: 2.5 },
-  // back figure
-  { k: "c", cx: 180, cy: 16, r: 9 },
-  { k: "r", x: 176, y: 24, w: 8, h: 7, rx: 2 },
-  { k: "c", cx: 154, cy: 93, r: 3.5 },
-  { k: "c", cx: 206, cy: 93, r: 3.5 },
-  { k: "r", x: 165, y: 154, w: 12, h: 5, rx: 2.5 },
-  { k: "r", x: 183, y: 154, w: 12, h: 5, rx: 2.5 },
+  // front figure (cx=60)
+  { k: "e", cx: 60, cy: 15, rx: 8, ry: 9.5 },
+  { k: "r", x: 55.5, y: 22, w: 9, h: 8, rx: 2 },
+  { k: "p", d: "M 38 34 Q 44 27 60 27 Q 76 27 82 34 L 78 47 Q 74 62 73 72 Q 75 80 75 86 L 71 95 Q 66 98 60 98 Q 54 98 49 95 L 45 86 Q 45 80 47 72 Q 46 62 42 47 Z" },
+  { k: "r", x: -5.5, y: -2, w: 11, h: 36, rx: 5.5, t: "translate(40,34) rotate(12)" },
+  { k: "r", x: -5.5, y: -2, w: 11, h: 36, rx: 5.5, t: "translate(80,34) rotate(-12)" },
+  { k: "r", x: -4.5, y: -2, w: 9, h: 32, rx: 4.5, t: "translate(33.3,66) rotate(18)" },
+  { k: "r", x: -4.5, y: -2, w: 9, h: 32, rx: 4.5, t: "translate(87,66) rotate(-18)" },
+  { k: "c", cx: 23.5, cy: 97, r: 4 },
+  { k: "c", cx: 96.5, cy: 97, r: 4 },
+  { k: "r", x: 44, y: 88, w: 14, h: 44, rx: 7 },
+  { k: "r", x: 62, y: 88, w: 14, h: 44, rx: 7 },
+  { k: "r", x: 45.5, y: 128, w: 11, h: 36, rx: 5.5 },
+  { k: "r", x: 63.5, y: 128, w: 11, h: 36, rx: 5.5 },
+  { k: "r", x: 42.5, y: 161, w: 13, h: 6, rx: 3 },
+  { k: "r", x: 64.5, y: 161, w: 13, h: 6, rx: 3 },
+  // back figure (cx=180)
+  { k: "e", cx: 180, cy: 15, rx: 8, ry: 9.5 },
+  { k: "r", x: 175.5, y: 22, w: 9, h: 8, rx: 2 },
+  { k: "p", d: "M 158 34 Q 164 27 180 27 Q 196 27 202 34 L 198 47 Q 194 62 193 72 Q 195 80 195 86 L 191 95 Q 186 98 180 98 Q 174 98 169 95 L 165 86 Q 165 80 167 72 Q 166 62 162 47 Z" },
+  { k: "r", x: -5.5, y: -2, w: 11, h: 36, rx: 5.5, t: "translate(160,34) rotate(12)" },
+  { k: "r", x: -5.5, y: -2, w: 11, h: 36, rx: 5.5, t: "translate(200,34) rotate(-12)" },
+  { k: "r", x: -4.5, y: -2, w: 9, h: 32, rx: 4.5, t: "translate(153.3,66) rotate(18)" },
+  { k: "r", x: -4.5, y: -2, w: 9, h: 32, rx: 4.5, t: "translate(207,66) rotate(-18)" },
+  { k: "c", cx: 143.5, cy: 97, r: 4 },
+  { k: "c", cx: 216.5, cy: 97, r: 4 },
+  { k: "r", x: 164, y: 88, w: 14, h: 44, rx: 7 },
+  { k: "r", x: 182, y: 88, w: 14, h: 44, rx: 7 },
+  { k: "r", x: 165.5, y: 128, w: 11, h: 36, rx: 5.5 },
+  { k: "r", x: 183.5, y: 128, w: 11, h: 36, rx: 5.5 },
+  { k: "r", x: 162.5, y: 161, w: 13, h: 6, rx: 3 },
+  { k: "r", x: 184.5, y: 161, w: 13, h: 6, rx: 3 },
 ];
 
-// Muscle regions. "shoulders" and "forearms" appear on both figures and
-// share one fill. Order matters: the back/lat path is listed before
-// shoulders so rear delts render on top of it. "full body" has no region.
+// Anatomical muscle regions. "shoulders" and "forearms" appear on both
+// figures and share one fill. "full body" has no region and is skipped.
+// Back = traps kite + lat wings + spinal erectors, all one enum muscle.
 const REGIONS: { muscle: Muscle; shapes: Shape[] }[] = [
+  {
+    muscle: "chest",
+    shapes: [
+      { k: "p", d: "M 61 33 Q 69 32 75.5 35.5 Q 77.5 41 75 47 Q 68 51.5 61 48.5 Z" },
+      { k: "p", d: "M 59 33 Q 51 32 44.5 35.5 Q 42.5 41 45 47 Q 52 51.5 59 48.5 Z" },
+    ],
+  },
   {
     muscle: "back",
     shapes: [
-      {
-        k: "p",
-        d: "M 168 30 L 192 30 Q 196 30 196.5 37 L 196 50 Q 192.5 65 188.5 73 L 171.5 73 Q 167.5 65 164 50 L 163.5 37 Q 164 30 168 30 Z",
-      },
+      { k: "p", d: "M 180 27 Q 186 29 191 33 Q 186 45 180 52 Q 174 45 169 33 Q 174 29 180 27 Z" },
+      { k: "p", d: "M 182 50 Q 190 48 195.5 44 Q 196.5 54 193 64 Q 188 73 182 77 Z" },
+      { k: "p", d: "M 178 50 Q 170 48 164.5 44 Q 163.5 54 167 64 Q 172 73 178 77 Z" },
+      { k: "r", x: 176.3, y: 62, w: 3.2, h: 20, rx: 1.6 },
+      { k: "r", x: 180.5, y: 62, w: 3.2, h: 20, rx: 1.6 },
     ],
   },
   {
     muscle: "shoulders",
     shapes: [
-      { k: "c", cx: 40, cy: 36, r: 6.5 },
-      { k: "c", cx: 80, cy: 36, r: 6.5 },
-      { k: "c", cx: 160, cy: 36, r: 6.5 },
-      { k: "c", cx: 200, cy: 36, r: 6.5 },
+      { k: "e", cx: 39, cy: 35.5, rx: 7, ry: 6.5 },
+      { k: "e", cx: 81, cy: 35.5, rx: 7, ry: 6.5 },
+      { k: "e", cx: 159, cy: 35.5, rx: 7, ry: 6.5 },
+      { k: "e", cx: 201, cy: 35.5, rx: 7, ry: 6.5 },
     ],
   },
   {
-    muscle: "chest",
+    muscle: "core",
     shapes: [
-      { k: "r", x: 47, y: 32, w: 12.5, h: 14, rx: 5 },
-      { k: "r", x: 60.5, y: 32, w: 12.5, h: 14, rx: 5 },
+      { k: "r", x: 52.5, y: 52, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 60.5, y: 52, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 52.5, y: 61, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 60.5, y: 61, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 52.5, y: 70, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 60.5, y: 70, w: 7, h: 8, rx: 2 },
+      { k: "r", x: 52.5, y: 79, w: 7, h: 12, rx: 3 },
+      { k: "r", x: 60.5, y: 79, w: 7, h: 12, rx: 3 },
+      { k: "e", cx: 49.2, cy: 70, rx: 2.2, ry: 13 },
+      { k: "e", cx: 70.8, cy: 70, rx: 2.2, ry: 13 },
     ],
   },
-  { muscle: "core", shapes: [{ k: "r", x: 50, y: 48, w: 20, h: 26, rx: 6 }] },
   {
     muscle: "biceps",
     shapes: [
-      { k: "r", x: 31, y: 44, w: 9, h: 20, rx: 4.5 },
-      { k: "r", x: 80, y: 44, w: 9, h: 20, rx: 4.5 },
+      { k: "e", cx: 0, cy: 16, rx: 4.5, ry: 10, t: "translate(40,34) rotate(12)" },
+      { k: "e", cx: 0, cy: 16, rx: 4.5, ry: 10, t: "translate(80,34) rotate(-12)" },
     ],
   },
   {
     muscle: "triceps",
     shapes: [
-      { k: "r", x: 150.5, y: 44, w: 9, h: 20, rx: 4.5 },
-      { k: "r", x: 200.5, y: 44, w: 9, h: 20, rx: 4.5 },
+      { k: "e", cx: 0, cy: 16, rx: 4.5, ry: 10, t: "translate(160,34) rotate(12)" },
+      { k: "e", cx: 0, cy: 16, rx: 4.5, ry: 10, t: "translate(200,34) rotate(-12)" },
     ],
   },
   {
     muscle: "forearms",
     shapes: [
-      { k: "r", x: 30, y: 66, w: 8, h: 22, rx: 4 },
-      { k: "r", x: 82, y: 66, w: 8, h: 22, rx: 4 },
-      { k: "r", x: 150, y: 66, w: 8, h: 22, rx: 4 },
-      { k: "r", x: 202, y: 66, w: 8, h: 22, rx: 4 },
+      { k: "e", cx: 0, cy: 13, rx: 3.5, ry: 11, t: "translate(33.3,66) rotate(18)" },
+      { k: "e", cx: 0, cy: 13, rx: 3.5, ry: 11, t: "translate(87,66) rotate(-18)" },
+      { k: "e", cx: 0, cy: 13, rx: 3.5, ry: 11, t: "translate(153.3,66) rotate(18)" },
+      { k: "e", cx: 0, cy: 13, rx: 3.5, ry: 11, t: "translate(207,66) rotate(-18)" },
     ],
   },
   {
     muscle: "quads",
     shapes: [
-      { k: "r", x: 46.5, y: 88, w: 12, h: 34, rx: 6 },
-      { k: "r", x: 61.5, y: 88, w: 12, h: 34, rx: 6 },
+      { k: "e", cx: 47.4, cy: 105, rx: 3.2, ry: 14 },
+      { k: "e", cx: 52.2, cy: 104, rx: 3.8, ry: 13.5 },
+      { k: "e", cx: 55.8, cy: 115, rx: 2.6, ry: 7 },
+      { k: "e", cx: 72.6, cy: 105, rx: 3.2, ry: 14 },
+      { k: "e", cx: 67.8, cy: 104, rx: 3.8, ry: 13.5 },
+      { k: "e", cx: 64.2, cy: 115, rx: 2.6, ry: 7 },
     ],
   },
   {
     muscle: "glutes",
     shapes: [
-      { k: "r", x: 167, y: 76, w: 12.5, h: 12, rx: 6 },
-      { k: "r", x: 180.5, y: 76, w: 12.5, h: 12, rx: 6 },
+      { k: "e", cx: 173.5, cy: 93, rx: 7, ry: 8 },
+      { k: "e", cx: 186.5, cy: 93, rx: 7, ry: 8 },
     ],
   },
   {
     muscle: "hamstrings",
     shapes: [
-      { k: "r", x: 167, y: 90, w: 12, h: 31, rx: 6 },
-      { k: "r", x: 181, y: 90, w: 12, h: 31, rx: 6 },
+      { k: "e", cx: 168, cy: 116, rx: 3.5, ry: 14 },
+      { k: "e", cx: 175.2, cy: 116, rx: 2.9, ry: 12.5 },
+      { k: "e", cx: 192, cy: 116, rx: 3.5, ry: 14 },
+      { k: "e", cx: 184.8, cy: 116, rx: 2.9, ry: 12.5 },
     ],
   },
   {
     muscle: "calves",
     shapes: [
-      { k: "r", x: 168.5, y: 123, w: 9.5, h: 28, rx: 4.75 },
-      { k: "r", x: 182, y: 123, w: 9.5, h: 28, rx: 4.75 },
+      // front (tibialis) slivers
+      { k: "e", cx: 48, cy: 142, rx: 2.6, ry: 10 },
+      { k: "e", cx: 54.2, cy: 142, rx: 2.2, ry: 9 },
+      { k: "e", cx: 72, cy: 142, rx: 2.6, ry: 10 },
+      { k: "e", cx: 65.8, cy: 142, rx: 2.2, ry: 9 },
+      // back (gastrocnemius) heads
+      { k: "e", cx: 168.8, cy: 142, rx: 3, ry: 11 },
+      { k: "e", cx: 174.4, cy: 143, rx: 2.2, ry: 10 },
+      { k: "e", cx: 191.2, cy: 142, rx: 3, ry: 11 },
+      { k: "e", cx: 185.6, cy: 143, rx: 2.2, ry: 10 },
     ],
   },
 ];
 
-const NEUTRAL_FILL = "#26262e";
-const UNTRAINED_FILL = "#26262e";
+const NEUTRAL_FILL = "#2b2b33";
+// Slightly lighter than the silhouette so untrained regions stay visible.
+const UNTRAINED_FILL = "#383841";
 const OVER_MRV_FILL = "#f59e0b";
 
 interface MuscleBodyMapProps {
@@ -231,12 +280,18 @@ function fillFor(
   return { fill: "var(--accent)", opacity: 0.45 + 0.55 * t };
 }
 
-function draw(s: Shape, fill: string, opacity: number, key: number) {
-  const common = { fill, fillOpacity: opacity, key };
-  if (s.k === "c") return <circle cx={s.cx} cy={s.cy} r={s.r} {...common} />;
+function draw(s: Shape, key: number) {
+  if (s.k === "c")
+    return <circle key={key} cx={s.cx} cy={s.cy} r={s.r} transform={s.t} />;
+  if (s.k === "e")
+    return (
+      <ellipse key={key} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} transform={s.t} />
+    );
   if (s.k === "r")
-    return <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} {...common} />;
-  return <path d={s.d} {...common} />;
+    return (
+      <rect key={key} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.rx} transform={s.t} />
+    );
+  return <path key={key} d={s.d} transform={s.t} />;
 }
 
 export function MuscleBodyMap({ sets, mode, className }: MuscleBodyMapProps) {
@@ -247,12 +302,14 @@ export function MuscleBodyMap({ sets, mode, className }: MuscleBodyMapProps) {
       aria-label="Muscle load body map"
       className={cn("w-full max-w-xs", className)}
     >
-      {NEUTRAL.map((s, i) => draw(s, NEUTRAL_FILL, 1, i))}
+      <g fill={NEUTRAL_FILL}>{NEUTRAL.map((s, i) => draw(s, i))}</g>
       {REGIONS.map((r) => {
         const { fill, opacity } = fillFor(r.muscle, sets[r.muscle] ?? 0, mode);
         return (
-          <g key={r.muscle}>
-            {r.shapes.map((s, i) => draw(s, fill, opacity, i))}
+          // opacity on the <g>, never per shape: regions overlap internally
+          // and must composite as one uniform mass.
+          <g key={r.muscle} fill={fill} opacity={opacity}>
+            {r.shapes.map((s, i) => draw(s, i))}
           </g>
         );
       })}
