@@ -78,19 +78,21 @@ add `&& !s.warmup` in Phase 2 (it is listed there as a call site).
 
 ### 1b. New component `src/components/gym/muscle-body-map.tsx`
 
-The anatomical SVG path data **already exists in the repo** at
+The anatomical SVG data **already exists in the repo** at
 `src/components/gym/body-map-paths.ts` (committed alongside this spec;
 vendored from react-native-body-highlighter, MIT — attribution header in
-the file). It exports `NEUTRAL_PATHS` (silhouette: head, hands, knees,
-feet) and `MUSCLE_PATHS` (bezier paths keyed by the LifeOS `Muscle` enum),
-all in one shared coordinate space — viewBox "0 0 1448 1448", front figure
-at x 0–724, back figure at x 724–1448. **Do not modify, regenerate, or
-"clean up" that file.** Build this component around it, verbatim:
+the file). It exports `BODY_FRONT` and `BODY_BACK` (`BodySideData`): bezier
+`muscles` paths keyed by the LifeOS `Muscle` enum, `neutral` silhouette
+parts (head, hands, knees, feet), and `anchors` — precomputed label
+leader-line attachment points per muscle. Front figure lives in viewBox
+"0 0 724 1448", back figure in "724 0 724 1448"; label mode widens the box
+by 250 units per side for the callout margins. **Do not modify, regenerate,
+or "clean up" that file.** Build this component around it, verbatim:
 
 ```tsx
 "use client";
 
-import { MUSCLE_PATHS, NEUTRAL_PATHS } from "./body-map-paths";
+import { BODY_BACK, BODY_FRONT } from "./body-map-paths";
 import { VOLUME_LANDMARKS } from "@/lib/fitness";
 import type { Muscle } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -98,16 +100,14 @@ import { cn } from "@/lib/utils";
 const NEUTRAL_FILL = "#2b2b33";
 // Slightly lighter than the silhouette so untrained regions stay visible.
 const UNTRAINED_FILL = "#383841";
+const SEAM = "#15151a";
 const OVER_MRV_FILL = "#f59e0b";
-
-// Every path once, for the underlay pass that fuses the separate anatomy
-// parts into one connected body silhouette.
-const ALL_PATHS: string[] = [
-  ...NEUTRAL_PATHS,
-  ...Object.values(MUSCLE_PATHS).flatMap((p) => p ?? []),
-];
+// Pale base the accent is mixed into: light tint = light load, full accent
+// = heavy load. Keeps the ramp theme-aware across accent colors.
+const TINT = "#dce4f2";
 
 interface MuscleBodyMapProps {
+  side: "front" | "back";
   /** Weighted set counts per muscle (primary 1, secondary 0.5). */
   sets: Partial<Record<Muscle, number>>;
   /**
@@ -115,6 +115,8 @@ interface MuscleBodyMapProps {
    * "load": colors by this-session load, saturating at 6 sets.
    */
   mode: "landmarks" | "load";
+  /** Callout labels with leader lines for the 4 most-loaded muscles. */
+  labels?: boolean;
   className?: string;
 }
 
@@ -122,26 +124,77 @@ function fillFor(
   muscle: Muscle,
   n: number,
   mode: MuscleBodyMapProps["mode"]
-): { fill: string; opacity: number } {
-  if (n <= 0) return { fill: UNTRAINED_FILL, opacity: 1 };
+): string {
+  if (n <= 0) return UNTRAINED_FILL;
   if (mode === "load") {
-    const t = Math.min(n / 6, 1);
-    return { fill: "var(--accent)", opacity: 0.25 + 0.75 * t };
+    const p = 35 + 65 * Math.min(n / 6, 1);
+    return `color-mix(in srgb, var(--accent) ${p}%, ${TINT})`;
   }
   const { mev, mrv } = VOLUME_LANDMARKS[muscle];
-  if (n > mrv) return { fill: OVER_MRV_FILL, opacity: 0.9 };
-  if (n < mev) return { fill: "var(--accent)", opacity: 0.25 };
+  if (n > mrv) return OVER_MRV_FILL;
+  if (n < mev) return `color-mix(in srgb, var(--accent) 35%, ${TINT})`;
   const t = mrv === mev ? 1 : (n - mev) / (mrv - mev);
-  return { fill: "var(--accent)", opacity: 0.45 + 0.55 * t };
+  return `color-mix(in srgb, var(--accent) ${55 + 45 * t}%, ${TINT})`;
 }
 
-export function MuscleBodyMap({ sets, mode, className }: MuscleBodyMapProps) {
+function loadWord(
+  muscle: Muscle,
+  n: number,
+  mode: MuscleBodyMapProps["mode"]
+): string {
+  if (mode === "landmarks") {
+    if (n <= 0) return "Untrained";
+    const { mev, mrv } = VOLUME_LANDMARKS[muscle];
+    return n > mrv ? "Over MRV" : n < mev ? "Below MEV" : "Optimal";
+  }
+  if (n <= 0) return "No load";
+  const t = Math.min(n / 6, 1);
+  return t < 0.34 ? "Low load" : t < 0.67 ? "Medium load" : "High load";
+}
+
+export function MuscleBodyMap({
+  side,
+  sets,
+  mode,
+  labels = false,
+  className,
+}: MuscleBodyMapProps) {
+  const body = side === "front" ? BODY_FRONT : BODY_BACK;
+  const base = side === "front" ? 0 : 724;
+  const viewBox = labels
+    ? `${base - 250} 0 1224 1448`
+    : `${base} 0 724 1448`;
+  const allPaths = [
+    ...body.neutral,
+    ...Object.values(body.muscles).flatMap((p) => p ?? []),
+  ];
+
+  // Top 4 muscles by load, top-to-bottom, alternating right/left columns,
+  // pushed apart vertically so labels never overlap.
+  const callouts: { m: Muscle; col: "left" | "right"; y: number }[] = [];
+  if (labels) {
+    const chosen = (Object.keys(body.anchors) as Muscle[])
+      .sort((a, b) => (sets[b] ?? 0) - (sets[a] ?? 0))
+      .slice(0, 4)
+      .sort((a, b) => body.anchors[a]!.right[1] - body.anchors[b]!.right[1]);
+    const last = { left: 0, right: 0 };
+    for (const [i, m] of chosen.entries()) {
+      const col = i % 2 === 0 ? "right" : "left";
+      const y = Math.max(
+        Math.min(Math.max(body.anchors[m]![col][1], 160), 1320),
+        last[col] + 150
+      );
+      last[col] = y;
+      callouts.push({ m, col, y });
+    }
+  }
+
   return (
     <svg
-      viewBox="0 0 1448 1448"
+      viewBox={viewBox}
       role="img"
-      aria-label="Muscle load body map"
-      className={cn("w-full max-w-xs", className)}
+      aria-label={`Muscle ${mode === "load" ? "load" : "volume"} body map (${side})`}
+      className={cn("w-full", className)}
     >
       {/* Fat-stroked underlay: fuses the anatomy parts into one connected
           silhouette so the figure reads as a body, not floating shapes. */}
@@ -151,32 +204,68 @@ export function MuscleBodyMap({ sets, mode, className }: MuscleBodyMapProps) {
         strokeWidth={26}
         strokeLinejoin="round"
       >
-        {ALL_PATHS.map((d, i) => (
+        {allPaths.map((d, i) => (
           <path key={i} d={d} />
         ))}
       </g>
       <g fill={NEUTRAL_FILL}>
-        {NEUTRAL_PATHS.map((d, i) => (
+        {body.neutral.map((d, i) => (
           <path key={i} d={d} />
         ))}
       </g>
-      {(Object.keys(MUSCLE_PATHS) as Muscle[]).map((m) => {
-        const { fill, opacity } = fillFor(m, sets[m] ?? 0, mode);
+      {(Object.keys(body.muscles) as Muscle[]).map((m) => (
+        // color-mix needs CSS `style`, not the SVG fill attribute; the thin
+        // dark stroke cuts seams between muscle heads.
+        <g
+          key={m}
+          stroke={SEAM}
+          strokeWidth={3}
+          style={{ fill: fillFor(m, sets[m] ?? 0, mode) }}
+        >
+          {body.muscles[m]!.map((d, i) => (
+            <path key={i} d={d} />
+          ))}
+        </g>
+      ))}
+      {callouts.map(({ m, col, y }) => {
+        const [ax, ay] = body.anchors[m]![col];
+        const n = sets[m] ?? 0;
+        const textX = col === "right" ? base + 714 : base + 10;
+        const lineX = col === "right" ? base + 704 : base + 20;
+        const anchor = col === "right" ? "start" : "end";
         return (
-          // opacity on the <g>, not per path, so a muscle reads as one mass.
-          <g key={m} fill={fill} opacity={opacity}>
-            {MUSCLE_PATHS[m]!.map((d, i) => (
-              <path key={i} d={d} />
-            ))}
+          <g key={m}>
+            <line
+              x1={lineX}
+              y1={y}
+              x2={ax}
+              y2={ay}
+              stroke="#565662"
+              strokeWidth={2.5}
+            />
+            <circle cx={ax} cy={ay} r={8} fill="#565662" />
+            <text
+              x={textX}
+              y={y - 8}
+              textAnchor={anchor}
+              fontSize={46}
+              fontWeight={600}
+              fill="#d4d4dc"
+            >
+              {m.charAt(0).toUpperCase() + m.slice(1)}
+            </text>
+            <text
+              x={textX}
+              y={y + 40}
+              textAnchor={anchor}
+              fontSize={38}
+              style={{ fill: n > 0 ? fillFor(m, n, mode) : "#7f7f8a" }}
+            >
+              {loadWord(m, n, mode)}
+            </text>
           </g>
         );
       })}
-      <text x="362" y="1436" textAnchor="middle" fontSize="48" fill="#8e8e97">
-        Front
-      </text>
-      <text x="1086" y="1436" textAnchor="middle" fontSize="48" fill="#8e8e97">
-        Back
-      </text>
     </svg>
   );
 }
@@ -186,35 +275,64 @@ export function MuscleBodyMap({ sets, mode, className }: MuscleBodyMapProps) {
 
 `src/components/gym/progress-tab.tsx`, in the "Volume Landmarks" section
 (~line 368): the section currently renders a header then a grid of
-`LandmarkBar`s fed by `weeklySetsByMuscle`. Insert the map between the
+`LandmarkBar`s fed by `weeklySetsByMuscle`. Insert both figures between the
 header row and the grid, centered:
 
 ```tsx
-<div className="flex justify-center">
-  <MuscleBodyMap sets={weeklySetsByMuscle} mode="landmarks" />
+<div className="flex justify-center gap-3">
+  <MuscleBodyMap
+    side="front"
+    sets={weeklySetsByMuscle}
+    mode="landmarks"
+    className="max-w-36"
+  />
+  <MuscleBodyMap
+    side="back"
+    sets={weeklySetsByMuscle}
+    mode="landmarks"
+    className="max-w-36"
+  />
 </div>
 ```
 
 plus a one-line legend under it, `text-[0.6rem] text-text-tertiary`
-centered: `dim = below MEV · bright = optimal · amber = over MRV`.
+centered: `pale = below MEV · vivid = optimal · amber = over MRV`.
 Keep the existing bars — the map is the overview, bars are the detail.
 
 ### 1d. End-workout dialog integration
 
 `src/app/gym/workout/page.tsx`, in the end-workout `Dialog` ("Workout
 summary", ~line 625): after the 2×2 stat grid and before the
-`musclesHit` "Trained: …" line, add:
+`musclesHit` "Trained: …" line, add a single labeled figure with a
+front/back toggle:
 
 ```tsx
-<div className="flex justify-center">
+<div className="flex flex-col items-center gap-1">
   <MuscleBodyMap
+    side={mapSide}
     sets={sessionSetsByMuscle(active, customExercises)}
     mode="load"
+    labels
+    className="max-w-[16rem]"
   />
+  <div className="flex gap-1">
+    {(["front", "back"] as const).map((s) => (
+      <Button
+        key={s}
+        variant={mapSide === s ? "secondary" : "ghost"}
+        size="sm"
+        onClick={() => setMapSide(s)}
+      >
+        {s === "front" ? "Front" : "Back"}
+      </Button>
+    ))}
+  </div>
 </div>
 ```
 
-Import `sessionSetsByMuscle` from `@/lib/fitness` and `MuscleBodyMap` from
+with `const [mapSide, setMapSide] = useState<"front" | "back">("front");`
+next to the other dialog state (`endOpen` etc.). Import
+`sessionSetsByMuscle` from `@/lib/fitness` and `MuscleBodyMap` from
 `@/components/gym/muscle-body-map`. Keep the "Trained:" text line.
 
 ### Phase 1 checks
