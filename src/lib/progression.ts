@@ -60,7 +60,7 @@ function exerciseSessionsDesc(
   for (const s of sorted) {
     const we = s.exercises.find((e) => e.exerciseId === exerciseId);
     if (!we) continue;
-    const completed = we.sets.filter((x) => x.completed);
+    const completed = we.sets.filter((x) => x.completed && !x.warmup);
     if (completed.length > 0) out.push({ sets: completed, date: s.date });
   }
   return out;
@@ -78,7 +78,8 @@ function bestE1rmAtGym(
     const we = s.exercises.find((e) => e.exerciseId === exerciseId);
     if (!we) continue;
     for (const set of we.sets) {
-      if (set.completed) e1rm = Math.max(e1rm, estimate1RM(set.weight, set.reps));
+      if (!set.completed || set.warmup) continue;
+      e1rm = Math.max(e1rm, estimate1RM(set.weight, set.reps));
     }
   }
   return e1rm;
@@ -187,7 +188,7 @@ export function weeklySetsForMuscle(
     for (const we of s.exercises) {
       const m = getExercise(we.exerciseId, customExercises)?.muscle;
       if (m !== muscle) continue;
-      count += we.sets.filter((x) => x.completed).length;
+      count += we.sets.filter((x) => x.completed && !x.warmup).length;
     }
   };
   for (const s of sessions) if (s.endedAt) tally(s);
@@ -226,7 +227,7 @@ export function suggestNextSet(args: {
   // ── A. within-session: suggest the next set based on the one just done ──
   const completedThisSession = active
     ? (active.exercises.find((we) => we.exerciseId === exerciseId)?.sets ?? []).filter(
-        (s) => s.completed
+        (s) => s.completed && !s.warmup
       )
     : [];
   if (completedThisSession.length > 0) {

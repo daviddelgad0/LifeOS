@@ -115,8 +115,7 @@ export function sessionCalories(s: WorkoutSession): number {
 /**
  * Weighted completed-set counts per muscle for one session.
  * Primary muscle counts 1 per set, each secondary muscle 0.5.
- * Skips warmup-flagged sets (field added in a later phase; the
- * `!s.warmup` filter is written now and is a no-op until then).
+ * Skips warmup-flagged sets.
  */
 export function sessionSetsByMuscle(
   session: WorkoutSession,
@@ -126,7 +125,7 @@ export function sessionSetsByMuscle(
   for (const we of session.exercises) {
     const ex = getExercise(we.exerciseId, customExercises);
     if (!ex) continue;
-    const n = we.sets.filter((s) => s.completed).length;
+    const n = we.sets.filter((s) => s.completed && !s.warmup).length;
     if (n === 0) continue;
     out[ex.muscle] = (out[ex.muscle] ?? 0) + n;
     for (const sec of ex.secondary) out[sec] = (out[sec] ?? 0) + n * 0.5;

@@ -116,7 +116,7 @@ function bestE1RM(sessions: WorkoutSession[], ids: string[]): number {
     for (const we of s.exercises) {
       if (!set.has(we.exerciseId)) continue;
       for (const st of we.sets) {
-        if (st.completed) best = Math.max(best, estimate1RM(st.weight, st.reps));
+        if (st.completed && !st.warmup) best = Math.max(best, estimate1RM(st.weight, st.reps));
       }
     }
   }
@@ -136,7 +136,7 @@ function bestE1RMForMuscle(
     for (const we of s.exercises) {
       if (getExercise(we.exerciseId, custom)?.muscle !== muscle) continue;
       for (const st of we.sets) {
-        if (st.completed) best = Math.max(best, estimate1RM(st.weight, st.reps));
+        if (st.completed && !st.warmup) best = Math.max(best, estimate1RM(st.weight, st.reps));
       }
     }
   }

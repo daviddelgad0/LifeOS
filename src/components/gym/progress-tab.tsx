@@ -178,7 +178,7 @@ export function GymProgressTab() {
       for (const we of s.exercises) {
         const m = getExercise(we.exerciseId, customExercises)?.muscle as Muscle | undefined;
         if (!m) continue;
-        out[m] = (out[m] ?? 0) + we.sets.filter((x) => x.completed).length;
+        out[m] = (out[m] ?? 0) + we.sets.filter((x) => x.completed && !x.warmup).length;
       }
     }
     return out;
@@ -218,7 +218,7 @@ export function GymProgressTab() {
     for (const s of done) {
       for (const we of s.exercises) {
         for (const set of we.sets) {
-          if (!set.completed || set.weight === 0) continue;
+          if (!set.completed || set.warmup || set.weight === 0) continue;
           const cur = best.get(we.exerciseId);
           if (
             !cur ||

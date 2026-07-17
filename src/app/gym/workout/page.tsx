@@ -153,9 +153,17 @@ function SetRow({
         set.pr && "rounded-lg bg-accent-dim/40"
       )}
     >
-      <span className="text-center font-mono text-xs text-text-tertiary">
-        {index + 1}
-      </span>
+      <button
+        type="button"
+        onClick={() => updateSet(we.id, set.id, { warmup: !set.warmup })}
+        aria-label={set.warmup ? "Unmark warm-up set" : "Mark as warm-up set"}
+        className={cn(
+          "text-center font-mono text-xs transition-colors",
+          set.warmup ? "text-amber-500" : "text-text-tertiary hover:text-text-secondary"
+        )}
+      >
+        {set.warmup ? "W" : index + 1}
+      </button>
       <button
         type="button"
         onClick={() =>
@@ -389,7 +397,9 @@ export default function ActiveWorkoutPage() {
           const isBarbell = ex?.equipment === "barbell";
           const topSet = we.sets.reduce(
             (best, s) =>
-              s.completed && s.weight * s.reps > best.weight * best.reps ? s : best,
+              s.completed && !s.warmup && s.weight * s.reps > best.weight * best.reps
+                ? s
+                : best,
             { weight: 0, reps: 0 } as Pick<SetEntry, "weight" | "reps">
           );
           const suggestion = suggestionByExercise.get(we.exerciseId) ?? null;
@@ -592,7 +602,8 @@ export default function ActiveWorkoutPage() {
         </section>
 
         <p className="text-center text-xs text-text-tertiary">
-          Swipe a set left to delete it. Tap prev to copy last session.
+          Swipe a set left to delete it. Tap prev to copy last session. Tap
+          the set number to mark a warm-up.
         </p>
       </main>
 

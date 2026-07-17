@@ -39,6 +39,7 @@ export interface SetEntry {
   weight: number;
   reps: number;
   rir: number | null;
+  warmup?: boolean;
   note?: string;
   completed: boolean;
   pr?: boolean;

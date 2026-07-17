@@ -31,7 +31,7 @@ function topWeight(
     for (const we of s.exercises) {
       if (we.exerciseId !== exerciseId) continue;
       for (const set of we.sets) {
-        if (set.completed) top = Math.max(top, set.weight);
+        if (set.completed && !set.warmup) top = Math.max(top, set.weight);
       }
     }
   }

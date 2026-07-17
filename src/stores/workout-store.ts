@@ -104,7 +104,7 @@ function bestFor(sessions: WorkoutSession[], exerciseId: string, gym?: string) {
     for (const we of s.exercises) {
       if (we.exerciseId !== exerciseId) continue;
       for (const set of we.sets) {
-        if (!set.completed) continue;
+        if (!set.completed || set.warmup) continue;
         weight = Math.max(weight, set.weight);
         e1rm = Math.max(e1rm, estimate1RM(set.weight, set.reps));
       }
@@ -125,7 +125,7 @@ export function previousSets(
   for (const s of sorted) {
     const we = s.exercises.find((e) => e.exerciseId === exerciseId);
     if (we) {
-      const completed = we.sets.filter((x) => x.completed);
+      const completed = we.sets.filter((x) => x.completed && !x.warmup);
       if (completed.length > 0) return completed;
     }
   }
@@ -393,6 +393,7 @@ export const useWorkoutStore = create<WorkoutState>()(
         const best = bestFor(state.sessions, we.exerciseId, state.active.gym);
         const newE1rm = estimate1RM(target.weight, target.reps);
         const pr =
+          !target.warmup &&
           target.weight > 0 &&
           (target.weight > best.weight || newE1rm > best.e1rm);
         state.updateSet(weId, setId, { completed: true, pr });

@@ -44,9 +44,13 @@ export function exerciseHistory(
       if (we.exerciseId !== exerciseId) continue;
       for (const set of we.sets) {
         if (!set.completed) continue;
+        // Volume is total tonnage, warmups included; top/e1rm/reps feed
+        // strength progression (stall detection, progress-tab chart) and
+        // must reflect working sets only.
+        volume += set.weight * set.reps;
+        if (set.warmup) continue;
         top = Math.max(top, set.weight);
         e1rm = Math.max(e1rm, estimate1RM(set.weight, set.reps));
-        volume += set.weight * set.reps;
         reps += set.reps;
       }
     }
@@ -163,7 +167,7 @@ export function weeklySetsPerMuscle(
     for (const we of s.exercises) {
       const ex = getExercise(we.exerciseId, custom);
       if (!ex) continue;
-      const completed = we.sets.filter((x) => x.completed).length;
+      const completed = we.sets.filter((x) => x.completed && !x.warmup).length;
       if (completed === 0) continue;
       map.set(ex.muscle, (map.get(ex.muscle) ?? 0) + completed);
       for (const sec of ex.secondary) {
