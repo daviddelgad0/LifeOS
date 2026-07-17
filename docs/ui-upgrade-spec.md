@@ -81,10 +81,12 @@ add `&& !s.warmup` in Phase 2 (it is listed there as a call site).
 The anatomical SVG data **already exists in the repo** at
 `src/components/gym/body-map-paths.ts` (committed alongside this spec;
 vendored from react-native-body-highlighter, MIT — attribution header in
-the file). It exports `BODY_FRONT` and `BODY_BACK` (`BodySideData`): bezier
-`muscles` paths keyed by the LifeOS `Muscle` enum, `neutral` silhouette
-parts (head, hands, knees, feet), and `anchors` — precomputed label
-leader-line attachment points per muscle. Front figure lives in viewBox
+the file). It exports `BODY_FRONT` and `BODY_BACK` (`BodySideData`): a
+precomputed smooth `silhouette` union path drawn once behind everything,
+bezier `muscles` paths keyed by the LifeOS `Muscle` enum, `neutral`
+non-trainable parts (head, hands, knees, feet), and `anchors` —
+precomputed label leader-line attachment points per muscle. Front figure
+lives in viewBox
 "0 0 724 1448", back figure in "724 0 724 1448"; label mode widens the box
 by 250 units per side for the callout margins. **Do not modify, regenerate,
 or "clean up" that file.** Build this component around it, verbatim:
@@ -97,10 +99,11 @@ import { VOLUME_LANDMARKS } from "@/lib/fitness";
 import type { Muscle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const NEUTRAL_FILL = "#2b2b33";
-// Slightly lighter than the silhouette so untrained regions stay visible.
-const UNTRAINED_FILL = "#383841";
-const SEAM = "#15151a";
+const SILHOUETTE_FILL = "#2b2b33";
+// Neutral parts and untrained muscles sit slightly lighter than the
+// silhouette so the figure keeps its internal shape definition.
+const NEUTRAL_PART_FILL = "#33333c";
+const UNTRAINED_FILL = "#3d3d47";
 const OVER_MRV_FILL = "#f59e0b";
 // Pale base the accent is mixed into: light tint = light load, full accent
 // = heavy load. Keeps the ramp theme-aware across accent colors.
@@ -164,10 +167,6 @@ export function MuscleBodyMap({
   const viewBox = labels
     ? `${base - 250} 0 1224 1448`
     : `${base} 0 724 1448`;
-  const allPaths = [
-    ...body.neutral,
-    ...Object.values(body.muscles).flatMap((p) => p ?? []),
-  ];
 
   // Top 4 muscles by load, top-to-bottom, alternating right/left columns,
   // pushed apart vertically so labels never overlap.
@@ -196,32 +195,19 @@ export function MuscleBodyMap({
       aria-label={`Muscle ${mode === "load" ? "load" : "volume"} body map (${side})`}
       className={cn("w-full", className)}
     >
-      {/* Fat-stroked underlay: fuses the anatomy parts into one connected
-          silhouette so the figure reads as a body, not floating shapes. */}
-      <g
-        fill={NEUTRAL_FILL}
-        stroke={NEUTRAL_FILL}
-        strokeWidth={26}
-        strokeLinejoin="round"
-      >
-        {allPaths.map((d, i) => (
-          <path key={i} d={d} />
-        ))}
-      </g>
-      <g fill={NEUTRAL_FILL}>
+      {/* One precomputed smooth silhouette behind everything: the figure
+          reads as a connected body, and the art's own gaps between muscle
+          paths become clean, even seams showing this fill. evenodd keeps
+          real voids (between arm and torso) transparent. */}
+      <path d={body.silhouette} fill={SILHOUETTE_FILL} fillRule="evenodd" />
+      <g fill={NEUTRAL_PART_FILL}>
         {body.neutral.map((d, i) => (
           <path key={i} d={d} />
         ))}
       </g>
       {(Object.keys(body.muscles) as Muscle[]).map((m) => (
-        // color-mix needs CSS `style`, not the SVG fill attribute; the thin
-        // dark stroke cuts seams between muscle heads.
-        <g
-          key={m}
-          stroke={SEAM}
-          strokeWidth={3}
-          style={{ fill: fillFor(m, sets[m] ?? 0, mode) }}
-        >
+        // color-mix needs CSS `style`, not the SVG fill attribute.
+        <g key={m} style={{ fill: fillFor(m, sets[m] ?? 0, mode) }}>
           {body.muscles[m]!.map((d, i) => (
             <path key={i} d={d} />
           ))}
