@@ -1,3 +1,4 @@
+import { addDays, daysBetween, startOfWeek } from "./dates";
 import { getExercise } from "./exercises";
 import type { Exercise, Muscle, WorkoutSession } from "./types";
 import type { WeightUnit } from "./units";
@@ -129,6 +130,55 @@ export function sessionSetsByMuscle(
     if (n === 0) continue;
     out[ex.muscle] = (out[ex.muscle] ?? 0) + n;
     for (const sec of ex.secondary) out[sec] = (out[sec] ?? 0) + n * 0.5;
+  }
+  return out;
+}
+
+/** Completed non-warmup sets in the week of `todayISO` vs. the week before. */
+export function weeklySetTotals(
+  sessions: WorkoutSession[],
+  todayISO: string
+): { thisWeek: number; lastWeek: number } {
+  const weekStart = startOfWeek(todayISO);
+  const lastWeekStart = addDays(weekStart, -7);
+  let thisWeek = 0;
+  let lastWeek = 0;
+  for (const s of sessions) {
+    if (!s.endedAt) continue;
+    const n = s.exercises.reduce(
+      (acc, we) => acc + we.sets.filter((x) => x.completed && !x.warmup).length,
+      0
+    );
+    if (s.date >= weekStart) thisWeek += n;
+    else if (s.date >= lastWeekStart) lastWeek += n;
+  }
+  return { thisWeek, lastWeek };
+}
+
+/**
+ * Days since each muscle (primary only) last got a completed non-warmup set.
+ * Muscles never trained are absent. Finished sessions only.
+ */
+export function daysSinceByMuscle(
+  sessions: WorkoutSession[],
+  todayISO: string,
+  customExercises: Exercise[]
+): Partial<Record<Muscle, number>> {
+  const lastDate: Partial<Record<Muscle, string>> = {};
+  for (const s of sessions) {
+    if (!s.endedAt) continue;
+    for (const we of s.exercises) {
+      const ex = getExercise(we.exerciseId, customExercises);
+      if (!ex) continue;
+      if (!we.sets.some((x) => x.completed && !x.warmup)) continue;
+      if (!lastDate[ex.muscle] || s.date > lastDate[ex.muscle]!) {
+        lastDate[ex.muscle] = s.date;
+      }
+    }
+  }
+  const out: Partial<Record<Muscle, number>> = {};
+  for (const m of Object.keys(lastDate) as Muscle[]) {
+    out[m] = daysBetween(lastDate[m]!, todayISO);
   }
   return out;
 }

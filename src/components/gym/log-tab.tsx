@@ -29,7 +29,8 @@ import { CustomExerciseDialog } from "@/components/gym/custom-exercise-dialog";
 import { GymSelector } from "@/components/gym/gym-selector";
 import { WorkoutHistory } from "@/components/gym/workout-history";
 import { allExercises, getExercise } from "@/lib/exercises";
-import { MUSCLES } from "@/lib/fitness";
+import { daysSinceByMuscle, MUSCLES, weeklySetTotals } from "@/lib/fitness";
+import { todayISO } from "@/lib/dates";
 import {
   READINESS_COLOR,
   readiness,
@@ -44,6 +45,7 @@ export function GymLogTab() {
   const router = useRouter();
   const active = useWorkoutStore((s) => s.active);
   const routines = useWorkoutStore((s) => s.routines);
+  const sessions = useWorkoutStore((s) => s.sessions);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const startWorkout = useWorkoutStore((s) => s.startWorkout);
   const deleteRoutine = useWorkoutStore((s) => s.deleteRoutine);
@@ -72,6 +74,22 @@ export function GymLogTab() {
   };
 
   const whoop = useWhoopToday();
+
+  const totals = useMemo(
+    () => weeklySetTotals(sessions, todayISO()),
+    [sessions]
+  );
+  const stale = useMemo(
+    () =>
+      (Object.entries(daysSinceByMuscle(sessions, todayISO(), customExercises)) as [
+        Muscle,
+        number,
+      ][])
+        .filter(([, d]) => d >= 4)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3),
+    [sessions, customExercises]
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -106,6 +124,34 @@ export function GymLogTab() {
           </div>
           <ArrowRight className="size-4 text-accent" />
         </button>
+      )}
+
+      {sessions.some((s) => s.endedAt) && (
+        <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-lg font-medium">{totals.thisWeek}</span>
+            <span className="text-xs text-text-tertiary">sets this week</span>
+            {totals.lastWeek > 0 && totals.thisWeek !== totals.lastWeek && (
+              <span
+                className={cn(
+                  "font-mono text-xs",
+                  totals.thisWeek > totals.lastWeek ? "text-emerald-400" : "text-red-400"
+                )}
+              >
+                {totals.thisWeek > totals.lastWeek ? "+" : ""}
+                {Math.round(((totals.thisWeek - totals.lastWeek) / totals.lastWeek) * 100)}%
+              </span>
+            )}
+          </div>
+          {stale.map(([m, d]) => (
+            <span
+              key={m}
+              className="rounded-full border border-border px-2 py-0.5 text-[0.65rem] text-text-tertiary"
+            >
+              {m} · {d}d
+            </span>
+          ))}
+        </section>
       )}
 
       <div className="flex items-center gap-2">
