@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { CardioSheet, type CardioTarget } from "@/components/gym/cardio-sheet";
 import { GymSelector } from "@/components/gym/gym-selector";
+import { MuscleBodyMap } from "@/components/gym/muscle-body-map";
 import { PRCelebration } from "@/components/gym/pr-celebration";
 import { RestTimerBar } from "@/components/gym/rest-timer-bar";
 import {
@@ -48,6 +49,7 @@ import {
   estimate1RM,
   sessionCalories,
   sessionDurationMin,
+  sessionSetsByMuscle,
   sessionVolume,
 } from "@/lib/fitness";
 import { suggestNextSet, type SetSuggestion, type WhoopContext } from "@/lib/progression";
@@ -237,6 +239,7 @@ export default function ActiveWorkoutPage() {
   const [cardioTarget, setCardioTarget] = useState<CardioTarget | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [note, setNote] = useState("");
+  const [mapSide, setMapSide] = useState<"front" | "back">("front");
 
   useWakeLock();
   const now = useTick(1000);
@@ -653,6 +656,27 @@ export default function ActiveWorkoutPage() {
               <p className="font-mono text-xl font-medium">
                 {sessionCalories(active)}
               </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <MuscleBodyMap
+              side={mapSide}
+              sets={sessionSetsByMuscle(active, customExercises)}
+              mode="load"
+              labels
+              className="max-w-[16rem]"
+            />
+            <div className="flex gap-1">
+              {(["front", "back"] as const).map((s) => (
+                <Button
+                  key={s}
+                  variant={mapSide === s ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setMapSide(s)}
+                >
+                  {s === "front" ? "Front" : "Back"}
+                </Button>
+              ))}
             </div>
           </div>
           {musclesHit.length > 0 && (

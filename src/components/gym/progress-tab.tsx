@@ -63,6 +63,7 @@ import type { Muscle, WorkoutSession } from "@/lib/types";
 import { useAppStore } from "@/stores/app-store";
 import { toDisplayTotal, toDisplayWeight } from "@/lib/units";
 import { MeasurementDialog } from "@/components/gym/measurement-dialog";
+import { MuscleBodyMap } from "@/components/gym/muscle-body-map";
 import { useChatStore } from "@/stores/chat-store";
 import { useProductivityStore } from "@/stores/productivity-store";
 import { useTaskStore } from "@/stores/task-store";
@@ -372,6 +373,23 @@ export function GymProgressTab() {
           </h2>
           <span className="text-[0.6rem] text-text-tertiary">MEV · MRV</span>
         </div>
+        <div className="flex justify-center gap-3">
+          <MuscleBodyMap
+            side="front"
+            sets={weeklySetsByMuscle}
+            mode="landmarks"
+            className="max-w-36"
+          />
+          <MuscleBodyMap
+            side="back"
+            sets={weeklySetsByMuscle}
+            mode="landmarks"
+            className="max-w-36"
+          />
+        </div>
+        <p className="text-center text-[0.6rem] text-text-tertiary">
+          pale = below MEV · vivid = optimal · amber = over MRV
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {MUSCLES.map((m) => (
             <LandmarkBar

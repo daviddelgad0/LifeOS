@@ -1,4 +1,5 @@
-import type { Muscle, WorkoutSession } from "./types";
+import { getExercise } from "./exercises";
+import type { Exercise, Muscle, WorkoutSession } from "./types";
 import type { WeightUnit } from "./units";
 
 export const MUSCLES: Muscle[] = [
@@ -109,4 +110,26 @@ export function sessionDurationMin(s: WorkoutSession): number {
 /** Rough estimate: ~6 kcal per minute of lifting. */
 export function sessionCalories(s: WorkoutSession): number {
   return sessionDurationMin(s) * 6;
+}
+
+/**
+ * Weighted completed-set counts per muscle for one session.
+ * Primary muscle counts 1 per set, each secondary muscle 0.5.
+ * Skips warmup-flagged sets (field added in a later phase; the
+ * `!s.warmup` filter is written now and is a no-op until then).
+ */
+export function sessionSetsByMuscle(
+  session: WorkoutSession,
+  customExercises: Exercise[] = []
+): Partial<Record<Muscle, number>> {
+  const out: Partial<Record<Muscle, number>> = {};
+  for (const we of session.exercises) {
+    const ex = getExercise(we.exerciseId, customExercises);
+    if (!ex) continue;
+    const n = we.sets.filter((s) => s.completed).length;
+    if (n === 0) continue;
+    out[ex.muscle] = (out[ex.muscle] ?? 0) + n;
+    for (const sec of ex.secondary) out[sec] = (out[sec] ?? 0) + n * 0.5;
+  }
+  return out;
 }
