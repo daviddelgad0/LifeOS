@@ -8,6 +8,8 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  ChevronDown,
+  ChevronUp,
   Dumbbell,
   MoreHorizontal,
   Plus,
@@ -52,7 +54,13 @@ import {
   sessionSetsByMuscle,
   sessionVolume,
 } from "@/lib/fitness";
-import { suggestNextSet, type SetSuggestion, type WhoopContext } from "@/lib/progression";
+import {
+  progressionLadder,
+  suggestNextSet,
+  type LadderRung,
+  type SetSuggestion,
+  type WhoopContext,
+} from "@/lib/progression";
 import { todayISO } from "@/lib/dates";
 import type { CardioEntry, Muscle, SetEntry, WorkoutExercise } from "@/lib/types";
 import { previousSets, useWorkoutStore } from "@/stores/workout-store";
@@ -248,6 +256,7 @@ export default function ActiveWorkoutPage() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [note, setNote] = useState("");
   const [mapSide, setMapSide] = useState<"front" | "back">("front");
+  const [ladderFor, setLadderFor] = useState<string | null>(null);
 
   useWakeLock();
   const now = useTick(1000);
@@ -290,6 +299,25 @@ export default function ActiveWorkoutPage() {
     }
     return map;
   }, [active, sessions, customExercises, units, currentGym, whoopConnected, whoopDays]);
+
+  const ladderByExercise = useMemo(() => {
+    const map = new Map<string, LadderRung[] | null>();
+    if (!active) return map;
+    for (const we of active.exercises) {
+      if (map.has(we.exerciseId)) continue;
+      map.set(
+        we.exerciseId,
+        progressionLadder({
+          sessions,
+          exerciseId: we.exerciseId,
+          gym: active.gym ?? currentGym,
+          customExercises,
+          units,
+        })
+      );
+    }
+    return map;
+  }, [active, sessions, customExercises, units, currentGym]);
 
   const volume = active ? sessionVolume(active) : 0;
   const volumeDisplay = toDisplayTotal(volume, units);
@@ -404,6 +432,7 @@ export default function ActiveWorkoutPage() {
           );
           const suggestion = suggestionByExercise.get(we.exerciseId) ?? null;
           const firstUncompleted = we.sets.find((s) => !s.completed);
+          const ladder = ladderByExercise.get(we.exerciseId) ?? null;
           return (
             <section
               key={we.id}
@@ -467,29 +496,63 @@ export default function ActiveWorkoutPage() {
               </div>
 
               {suggestion && firstUncompleted && (
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-accent-border bg-accent-dim px-3 py-2">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate font-mono text-xs text-accent">
-                      Next: {toDisplayWeight(suggestion.weightLb, units)} {units} ×{" "}
-                      {suggestion.repsLo}–{suggestion.repsHi} @ {suggestion.targetRir} RIR
-                    </span>
-                    <span className="truncate text-xs text-text-tertiary">
-                      {suggestion.reason}
-                    </span>
+                <div className="flex flex-col gap-2 rounded-lg border border-accent-border bg-accent-dim px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate font-mono text-xs text-accent">
+                        Next: {toDisplayWeight(suggestion.weightLb, units)} {units} ×{" "}
+                        {suggestion.repsLo}–{suggestion.repsHi} @ {suggestion.targetRir} RIR
+                      </span>
+                      <span className="truncate text-xs text-text-tertiary">
+                        {suggestion.reason}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {ladder && (
+                        <button
+                          type="button"
+                          aria-label={ladderFor === we.id ? "Hide progression path" : "Show progression path"}
+                          onClick={() => setLadderFor(ladderFor === we.id ? null : we.id)}
+                          className="rounded p-1.5 text-accent transition-colors hover:bg-accent-dim"
+                        >
+                          {ladderFor === we.id ? (
+                            <ChevronUp className="size-3.5" />
+                          ) : (
+                            <ChevronDown className="size-3.5" />
+                          )}
+                        </button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          updateSet(we.id, firstUncompleted.id, {
+                            weight: suggestion.weightLb,
+                            reps: suggestion.repsLo,
+                          })
+                        }
+                      >
+                        Apply
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() =>
-                      updateSet(we.id, firstUncompleted.id, {
-                        weight: suggestion.weightLb,
-                        reps: suggestion.repsLo,
-                      })
-                    }
-                  >
-                    Apply
-                  </Button>
+                  {ladderFor === we.id && ladder && (
+                    <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-3 py-2">
+                      {ladder.map((r, idx) => (
+                        <span
+                          key={idx}
+                          className={cn(
+                            "font-mono text-xs",
+                            r.jump ? "text-accent" : "text-text-secondary"
+                          )}
+                        >
+                          {r.jump ? "→ " : ""}
+                          {toDisplayWeight(r.weightLb, units)} {units} × {r.reps}
+                          {r.jump ? " (add weight)" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -196,6 +196,58 @@ export function weeklySetsForMuscle(
   return count;
 }
 
+export interface LadderRung {
+  weightLb: number;
+  reps: number;
+  jump: boolean; // true = the weight-increase rung
+}
+
+/**
+ * The visible double-progression path from the last session to the next
+ * weight jump: hold rungs at the current weight climbing one rep at a time
+ * up to the range top, then one jump rung at the new weight and range
+ * bottom. Illustrative — no e1RM cap, no readiness/volume gates.
+ * Returns null when there's no finished history at this gym.
+ */
+export function progressionLadder(args: {
+  sessions: WorkoutSession[];
+  exerciseId: string;
+  gym: string | undefined;
+  routineTarget?: { targetReps: number };
+  customExercises: Exercise[];
+  units: WeightUnit;
+}): LadderRung[] | null {
+  const { sessions, exerciseId, gym, routineTarget, customExercises, units } = args;
+
+  const exercise = getExercise(exerciseId, customExercises);
+  const { lo, hi } = repRangeFor(exercise, routineTarget);
+  const isBodyweight = exercise?.equipment === "bodyweight";
+
+  const gymHistory = exerciseSessionsDesc(sessions, exerciseId, gym);
+  if (gymHistory.length === 0) return null;
+
+  const last = gymHistory[0];
+  const lastTop = topSetOf(last.sets);
+  const lastWeightLb = lastTop.weight;
+  const lastBestReps = Math.max(...last.sets.map((s) => s.reps));
+
+  const rungs: LadderRung[] = [];
+  for (let r = Math.max(lo, lastBestReps + 1); r <= hi; r++) {
+    rungs.push({ weightLb: lastWeightLb, reps: r, jump: false });
+  }
+
+  const stepDisplay = progressStepDisplay(exercise, units);
+  const stepLb = displayStepToLb(stepDisplay, units);
+  const jumpWeightLb = isBodyweight
+    ? lastWeightLb // bodyweight doesn't step up — callers render "add weight"
+    : roundWeightToStep(lastWeightLb + stepLb, stepDisplay, units);
+  rungs.push({ weightLb: jumpWeightLb, reps: lo, jump: true });
+
+  // Keep the last 6 — the jump rung is always the final element, so it
+  // always survives; only the earliest hold rungs get dropped.
+  return rungs.slice(-6);
+}
+
 export function suggestNextSet(args: {
   sessions: WorkoutSession[];
   active: WorkoutSession | null;
