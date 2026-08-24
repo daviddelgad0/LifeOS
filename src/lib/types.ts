@@ -72,6 +72,7 @@ export interface WorkoutSession {
   cardio?: CardioEntry[];
   gym?: string; // where it happened — scopes weight comparisons
   note?: string;
+  routineId?: string;
 }
 
 export interface RoutineExercise {
@@ -79,6 +80,9 @@ export interface RoutineExercise {
   targetSets: number;
   targetReps: number;
   restSeconds: number;
+  repLo?: number;
+  repHi?: number;
+  stepLb?: number;
 }
 
 export interface Routine {

@@ -168,7 +168,12 @@ export const useWorkoutStore = create<WorkoutState>()(
               exerciseId: re.exerciseId,
               setIndex: 0,
               gym: currentGym,
-              routineTarget: { targetReps: re.targetReps },
+              routineTarget: {
+                targetReps: re.targetReps,
+                repLo: re.repLo,
+                repHi: re.repHi,
+                stepLb: re.stepLb,
+              },
               customExercises,
               units,
               whoop,
@@ -212,6 +217,7 @@ export const useWorkoutStore = create<WorkoutState>()(
             exercises,
             cardio: [],
             gym: currentGym,
+            routineId: routine?.id,
           },
         });
       },

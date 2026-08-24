@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { getExercise } from "@/lib/exercises";
 import type { Routine, RoutineExercise } from "@/lib/types";
+import { toDisplayWeight, toStoredWeight, weightStep } from "@/lib/units";
+import { useAppStore } from "@/stores/app-store";
 import { useWorkoutStore } from "@/stores/workout-store";
 
 interface RoutineEditorProps {
@@ -27,10 +29,12 @@ export function RoutineEditor({ routine, open, onOpenChange }: RoutineEditorProp
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const addRoutine = useWorkoutStore((s) => s.addRoutine);
   const updateRoutine = useWorkoutStore((s) => s.updateRoutine);
+  const units = useAppStore((s) => s.units);
 
   const [name, setName] = useState("");
   const [exercises, setExercises] = useState<RoutineExercise[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState<Set<number>>(new Set());
 
   // Reload the draft when a different routine (or a fresh open) comes in —
   // render-time state adjustment keeps this out of effects.
@@ -41,8 +45,17 @@ export function RoutineEditor({ routine, open, onOpenChange }: RoutineEditorProp
     if (open) {
       setName(routine?.name ?? "");
       setExercises(routine?.exercises ?? []);
+      setAdvancedOpen(new Set());
     }
   }
+
+  const toggleAdvanced = (i: number) =>
+    setAdvancedOpen((s) => {
+      const next = new Set(s);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
 
   const patch = (i: number, p: Partial<RoutineExercise>) =>
     setExercises((list) =>
@@ -162,6 +175,62 @@ export function RoutineEditor({ routine, open, onOpenChange }: RoutineEditorProp
                     />
                   </label>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => toggleAdvanced(i)}
+                  className="self-start text-[0.65rem] text-text-tertiary hover:text-text-secondary hover:underline"
+                >
+                  {advancedOpen.has(i) ? "Hide advanced" : "Advanced"}
+                </button>
+                {advancedOpen.has(i) && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-text-tertiary">
+                      Rep lo
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        placeholder="auto"
+                        value={re.repLo ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          patch(i, { repLo: v === "" ? undefined : Number(v) });
+                        }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-text-tertiary">
+                      Rep hi
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        placeholder="auto"
+                        value={re.repHi ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          patch(i, { repHi: v === "" ? undefined : Number(v) });
+                        }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-text-tertiary">
+                      Step ({units})
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={weightStep(units)}
+                        placeholder="auto"
+                        value={re.stepLb != null ? toDisplayWeight(re.stepLb, units) : ""}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          patch(i, {
+                            stepLb: v === "" ? undefined : toStoredWeight(Number(v), units),
+                          });
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             );
           })}

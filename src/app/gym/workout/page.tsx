@@ -230,6 +230,7 @@ export default function ActiveWorkoutPage() {
   const router = useRouter();
   const active = useWorkoutStore((s) => s.active);
   const sessions = useWorkoutStore((s) => s.sessions);
+  const routines = useWorkoutStore((s) => s.routines);
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const addSet = useWorkoutStore((s) => s.addSet);
   const updateSet = useWorkoutStore((s) => s.updateSet);
@@ -279,9 +280,11 @@ export default function ActiveWorkoutPage() {
       days: whoopDays.map((d) => ({ date: d.date, recovery: d.recovery })),
     };
     const today = todayISO();
+    const routine = routines.find((r) => r.id === active.routineId);
     for (const we of active.exercises) {
       const firstUncompleted = we.sets.findIndex((s) => !s.completed);
       if (firstUncompleted === -1) continue;
+      const re = routine?.exercises.find((x) => x.exerciseId === we.exerciseId);
       map.set(
         we.exerciseId,
         suggestNextSet({
@@ -290,6 +293,12 @@ export default function ActiveWorkoutPage() {
           exerciseId: we.exerciseId,
           setIndex: firstUncompleted,
           gym: active.gym ?? currentGym,
+          routineTarget: re && {
+            targetReps: re.targetReps,
+            repLo: re.repLo,
+            repHi: re.repHi,
+            stepLb: re.stepLb,
+          },
           customExercises,
           units,
           whoop,
@@ -298,26 +307,34 @@ export default function ActiveWorkoutPage() {
       );
     }
     return map;
-  }, [active, sessions, customExercises, units, currentGym, whoopConnected, whoopDays]);
+  }, [active, sessions, customExercises, units, currentGym, whoopConnected, whoopDays, routines]);
 
   const ladderByExercise = useMemo(() => {
     const map = new Map<string, LadderRung[] | null>();
     if (!active) return map;
+    const routine = routines.find((r) => r.id === active.routineId);
     for (const we of active.exercises) {
       if (map.has(we.exerciseId)) continue;
+      const re = routine?.exercises.find((x) => x.exerciseId === we.exerciseId);
       map.set(
         we.exerciseId,
         progressionLadder({
           sessions,
           exerciseId: we.exerciseId,
           gym: active.gym ?? currentGym,
+          routineTarget: re && {
+            targetReps: re.targetReps,
+            repLo: re.repLo,
+            repHi: re.repHi,
+            stepLb: re.stepLb,
+          },
           customExercises,
           units,
         })
       );
     }
     return map;
-  }, [active, sessions, customExercises, units, currentGym]);
+  }, [active, sessions, customExercises, units, currentGym, routines]);
 
   const volume = active ? sessionVolume(active) : 0;
   const volumeDisplay = toDisplayTotal(volume, units);

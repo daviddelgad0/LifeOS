@@ -22,6 +22,14 @@ export interface WhoopContext {
   days: { date: string; recovery: number }[];
 }
 
+/** A routine's per-exercise targets, including optional per-exercise overrides. */
+interface RoutineTarget {
+  targetReps: number;
+  repLo?: number;
+  repHi?: number;
+  stepLb?: number;
+}
+
 export const TARGET_RIR_EARLY = 2; // sets 1..n-1 (acceptable band 1–3)
 // Reserved for a future last-set-aware suggestion (the decision order below
 // has no "is this the final set" input, since callers don't pass a set
@@ -129,8 +137,10 @@ function baseStepDisplay(units: WeightUnit): number {
  */
 function progressStepDisplay(
   exercise: Exercise | undefined,
-  units: WeightUnit
+  units: WeightUnit,
+  stepLb?: number
 ): number {
+  if (stepLb) return units === "kg" ? lbToKg(stepLb) : stepLb;
   const base = baseStepDisplay(units);
   if (!exercise) return base;
   if (exercise.equipment === "cable" || exercise.equipment === "machine") {
@@ -161,8 +171,13 @@ function naturalRangeFor(exercise: Exercise): { lo: number; hi: number } {
 
 function repRangeFor(
   exercise: Exercise | undefined,
-  routineTarget: { targetReps: number } | undefined
+  routineTarget: RoutineTarget | undefined
 ): { lo: number; hi: number } {
+  // User override beats the equipment-based natural range.
+  if (routineTarget?.repLo && routineTarget?.repHi) {
+    const lo = Math.max(1, routineTarget.repLo);
+    return { lo, hi: Math.max(lo, routineTarget.repHi) };
+  }
   if (exercise) return naturalRangeFor(exercise);
   // Exercise lookup failed (e.g. a deleted custom exercise) — no
   // equipment-based profile to generate from, fall back to the routine's own
@@ -213,7 +228,7 @@ export function progressionLadder(args: {
   sessions: WorkoutSession[];
   exerciseId: string;
   gym: string | undefined;
-  routineTarget?: { targetReps: number };
+  routineTarget?: RoutineTarget;
   customExercises: Exercise[];
   units: WeightUnit;
 }): LadderRung[] | null {
@@ -236,7 +251,7 @@ export function progressionLadder(args: {
     rungs.push({ weightLb: lastWeightLb, reps: r, jump: false });
   }
 
-  const stepDisplay = progressStepDisplay(exercise, units);
+  const stepDisplay = progressStepDisplay(exercise, units, routineTarget?.stepLb);
   const stepLb = displayStepToLb(stepDisplay, units);
   const jumpWeightLb = isBodyweight
     ? lastWeightLb // bodyweight doesn't step up — callers render "add weight"
@@ -254,7 +269,7 @@ export function suggestNextSet(args: {
   exerciseId: string;
   setIndex: number;
   gym: string | undefined;
-  routineTarget?: { targetReps: number };
+  routineTarget?: RoutineTarget;
   customExercises: Exercise[];
   units: WeightUnit;
   whoop?: WhoopContext;
@@ -471,7 +486,7 @@ export function suggestNextSet(args: {
         };
       }
 
-      const stepDisplay = progressStepDisplay(exercise, units);
+      const stepDisplay = progressStepDisplay(exercise, units, routineTarget?.stepLb);
       const stepLb = displayStepToLb(stepDisplay, units);
       const e1rm = bestE1rmAtGym(sessions, exerciseId, gym);
       const wTargetLb = e1rm > 0 ? e1rm / (1 + (lo + targetRir) / 30) : lastWeightLb + stepLb;
