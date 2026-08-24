@@ -253,6 +253,7 @@ export function GymProgressTab() {
   const [exerciseId, setExerciseId] = useState("bench-press");
   const [metric, setMetric] = useState<(typeof METRICS)[number]["id"]>("top");
   const [range, setRange] = useState<(typeof RANGES)[number]["id"]>("90");
+  const [landmarkMapSide, setLandmarkMapSide] = useState<"front" | "back">("front");
 
   const progression = useMemo(() => {
     const now = todayISO();
@@ -373,19 +374,26 @@ export function GymProgressTab() {
           </h2>
           <span className="text-[0.6rem] text-text-tertiary">MEV · MRV</span>
         </div>
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-col items-center gap-1">
           <MuscleBodyMap
-            side="front"
+            side={landmarkMapSide}
             sets={weeklySetsByMuscle}
             mode="landmarks"
-            className="max-w-36"
+            labels
+            className="max-w-[16rem]"
           />
-          <MuscleBodyMap
-            side="back"
-            sets={weeklySetsByMuscle}
-            mode="landmarks"
-            className="max-w-36"
-          />
+          <div className="flex gap-1">
+            {(["front", "back"] as const).map((s) => (
+              <Button
+                key={s}
+                variant={landmarkMapSide === s ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setLandmarkMapSide(s)}
+              >
+                {s === "front" ? "Front" : "Back"}
+              </Button>
+            ))}
+          </div>
         </div>
         <p className="text-center text-[0.6rem] text-text-tertiary">
           pale = below MEV · vivid = optimal · amber = over MRV
