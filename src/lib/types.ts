@@ -192,3 +192,15 @@ export interface ParsedSyllabusItem {
   due: string;
   include: boolean;
 }
+
+/** Class metadata extracted from a syllabus — everything but true user
+ * preferences (color, whether to sync). Fields the syllabus didn't state
+ * come back empty, never guessed. */
+export interface ParsedClassInfo {
+  name: string;
+  code: string;
+  professor: string;
+  location: string;
+  meetings: ClassMeeting[];
+  gradeWeights: { label: string; percent: number }[];
+}
