@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Check, Clock, Download, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -133,6 +134,17 @@ export default function SettingsPage() {
     }
     window.history.replaceState({}, "", "/settings");
   }, [whoopInit]);
+
+  // googleConnected only updates when the School → Sync tab's own effect
+  // runs, so this page showed stale/default state if you land here first —
+  // check the real connection directly instead of trusting a cached flag.
+  useEffect(() => {
+    fetch("/api/google-calendar", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => app.set("googleConnected", !!d.connected))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const estCost = Math.round(app.coachMessagesSent * 1.2) / 100;
   const budgetPct = Math.min(100, (estCost / Math.max(0.01, app.monthlyBudget)) * 100);
@@ -388,16 +400,23 @@ export default function SettingsPage() {
       <Section title="Connected accounts">
         <div className="flex items-center justify-between text-sm">
           <span>Google Calendar</span>
-          <span
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-xs",
-              app.googleConnected
-                ? "border-accent-border bg-accent-dim text-accent"
-                : "border-border text-text-tertiary"
-            )}
-          >
-            {app.googleConnected ? "Connected (stub)" : "Not connected"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs",
+                app.googleConnected
+                  ? "border-accent-border bg-accent-dim text-accent"
+                  : "border-border text-text-tertiary"
+              )}
+            >
+              {app.googleConnected ? "Connected" : "Not connected"}
+            </span>
+            <Link href="/school?tab=settings">
+              <Button variant="outline" size="sm">
+                {app.googleConnected ? "Manage" : "Connect"}
+              </Button>
+            </Link>
+          </div>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span>Whoop</span>
