@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Area,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Camera, Plus, Ruler, TrendingDown } from "lucide-react";
+import { Camera, Plus, Ruler, Syringe, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,12 @@ import {
 import { AXIS, ChartBox, TOOLTIP_STYLE } from "@/components/gym/chart-box";
 import { MeasurementDialog } from "@/components/gym/measurement-dialog";
 import { PhotoCalendar } from "@/components/gym/photo-calendar";
-import { bodyReport } from "@/lib/body";
+import { bodyReport, escalationCheck, weightTargetForDate } from "@/lib/body";
+import {
+  CYCLE_COMPOUNDS,
+  CYCLE_START_DATE,
+  CYCLE_WEEKLY_WEIGHT_TARGETS,
+} from "@/lib/cycle-plans";
 import { parseSex } from "@/lib/strength";
 import { formatShort, todayISO } from "@/lib/dates";
 import {
@@ -48,6 +54,10 @@ export function GymBodyTab() {
   const profile = useAppStore((s) => s.profile);
   const goalWeightLb = useAppStore((s) => s.goalWeightLb);
   const units = useAppStore((s) => s.units);
+  const cycleStartDate = useAppStore((s) => s.cycleStartDate);
+  const weeklyWeightTargets = useAppStore((s) => s.weeklyWeightTargets);
+  const compounds = useAppStore((s) => s.compounds);
+  const setAppState = useAppStore((s) => s.set);
 
   const [logOpen, setLogOpen] = useState(false);
   const [photos, setPhotos] = useState<Loaded[]>([]);
@@ -104,6 +114,15 @@ export function GymBodyTab() {
     await reload();
   };
 
+  const importCyclePlan = () => {
+    setAppState("cycleStartDate", CYCLE_START_DATE);
+    setAppState("weeklyWeightTargets", CYCLE_WEEKLY_WEIGHT_TARGETS);
+    setAppState("compounds", CYCLE_COMPOUNDS);
+    toast("Cycle plan imported", {
+      description: "Weekly weight targets and compound doses are set.",
+    });
+  };
+
   // ── Automatic body-fat estimate from the latest photo ──────────────────────
   const weightForEst = report.latestWeight ?? (parseFloat(profile.weightLb) || 0);
   const autoEstimate = useCallback(
@@ -155,10 +174,26 @@ export function GymBodyTab() {
   const photoBf = photos[0]?.bodyFat ?? null;
 
   // ── Charts ──────────────────────────────────────────────────────────────
+  // low/bandHeight (stacked areas) draw the weekly target band, when a
+  // cycle's imported — bandHeight is undefined outside the target table's
+  // 12 weeks (before/after the cycle), which just leaves the band blank there.
   const weightData = measurements
     .filter((m) => m.weight !== undefined)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((m) => ({ date: formatShort(m.date), value: wd(m.weight!) }));
+    .map((m) => {
+      const target = cycleStartDate
+        ? weightTargetForDate(m.date, cycleStartDate, weeklyWeightTargets)
+        : null;
+      const low = target ? wd(target.lowLb) : null;
+      const high = target ? wd(target.highLb) : null;
+      return {
+        date: formatShort(m.date),
+        value: wd(m.weight!),
+        low: low ?? undefined,
+        bandHeight: low != null && high != null ? Math.max(0, high - low) : undefined,
+      };
+    });
+  const hasWeightBand = weightData.some((d) => d.low !== undefined);
   const bfData = report.bfSeries.map((p) => ({
     date: formatShort(p.date),
     value: p.value,
@@ -178,10 +213,17 @@ export function GymBodyTab() {
           Weight, measurements, body-fat estimate, and progress photos — all in
           one place.
         </p>
-        <Button size="sm" onClick={() => setLogOpen(true)}>
-          <Ruler data-icon="inline-start" className="size-3.5" />
-          Log
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          {!cycleStartDate && (
+            <Button size="sm" variant="outline" onClick={importCyclePlan}>
+              Import cycle plan
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setLogOpen(true)}>
+            <Ruler data-icon="inline-start" className="size-3.5" />
+            Log
+          </Button>
+        </div>
       </div>
 
       {/* Snapshot */}
@@ -263,6 +305,43 @@ export function GymBodyTab() {
         )}
       </section>
 
+      {/* Compounds */}
+      {compounds.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+          <h2 className="flex items-center gap-2 text-sm font-medium text-text-tertiary">
+            <Syringe className="size-3.5" /> Compounds
+          </h2>
+          <div className="flex flex-col gap-2">
+            {compounds.map((c) => {
+              const check = escalationCheck(c, measurements, todayISO());
+              return (
+                <div
+                  key={c.name}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-raised px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{c.name}</p>
+                    <p className="text-xs text-text-tertiary">
+                      {c.doseLabel} · {check.weeksAtDose}w on this dose
+                    </p>
+                  </div>
+                  {check.ready && (
+                    <span className="shrink-0 rounded-full border border-accent-border bg-accent-dim px-2 py-0.5 text-[0.65rem] text-accent">
+                      Stalled 2+ wks — worth considering
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[0.6rem] text-text-tertiary">
+            Heuristic only — checks weight trend and time on dose, not
+            adherence. Confirm protein/calories are actually on target
+            yourself before changing anything.
+          </p>
+        </section>
+      )}
+
       {/* Trends */}
       {weightData.length >= 2 && (
         <section className="grid gap-4 sm:grid-cols-2">
@@ -271,6 +350,7 @@ export function GymBodyTab() {
             data={weightData}
             goal={goalWeightLb > 0 ? wd(goalWeightLb) : null}
             color="var(--accent)"
+            showBand={hasWeightBand}
           />
           {bfData.length >= 2 && (
             <TrendChart title="Body fat % (est.)" data={bfData} color="#F5A623" />
@@ -384,28 +464,57 @@ function TrendChart({
   data,
   color,
   goal,
+  showBand,
 }: {
   title: string;
-  data: { date: string; value: number | null }[];
+  data: { date: string; value: number | null; low?: number; bandHeight?: number }[];
   color: string;
   goal?: number | null;
+  showBand?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
       <h2 className="text-sm font-medium text-text-tertiary">{title}</h2>
       <ChartBox height={160}>
         {(w, h) => (
-          <LineChart width={w} height={h} data={data}>
+          <ComposedChart width={w} height={h} data={data}>
             <XAxis dataKey="date" {...AXIS} interval="preserveStartEnd" />
             <YAxis {...AXIS} width={34} domain={["auto", "auto"]} />
             <Tooltip contentStyle={TOOLTIP_STYLE} />
             {goal != null && (
               <ReferenceLine y={goal} stroke="rgba(255,255,255,0.25)" strokeDasharray="4 4" />
             )}
+            {showBand && (
+              <>
+                {/* Stacked areas draw a low-to-high band: the first is an
+                    invisible base up to `low`, the second the visible band
+                    on top of it, `bandHeight` tall. */}
+                <Area
+                  type="monotone"
+                  dataKey="low"
+                  stackId="target-band"
+                  stroke="none"
+                  fill="transparent"
+                  isAnimationActive={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="bandHeight"
+                  stackId="target-band"
+                  stroke="none"
+                  fill={color}
+                  fillOpacity={0.12}
+                  isAnimationActive={false}
+                />
+              </>
+            )}
             <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} />
-          </LineChart>
+          </ComposedChart>
         )}
       </ChartBox>
+      {showBand && (
+        <p className="text-[0.6rem] text-text-tertiary">shaded = target range</p>
+      )}
     </div>
   );
 }

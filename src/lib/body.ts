@@ -1,4 +1,5 @@
-import type { Measurement } from "./types";
+import { daysBetween } from "./dates";
+import type { CycleCompound, Measurement, WeeklyWeightTarget } from "./types";
 import { parseSex, type Sex } from "./strength";
 
 // Body-composition + progress estimates. Body fat uses RFM (Relative Fat Mass),
@@ -49,6 +50,57 @@ export function weeksToGoal(
   if (remaining > 0 && perWeek < 0) return Math.ceil(remaining / -perWeek);
   if (remaining < 0 && perWeek > 0) return Math.ceil(-remaining / perWeek);
   return null;
+}
+
+// ── cycle weight-target band ────────────────────────────────────────────
+export function weekIndexForDate(dateISO: string, cycleStartISO: string): number {
+  return Math.floor(daysBetween(cycleStartISO, dateISO) / 7) + 1;
+}
+
+/** The planned weight band for whatever week `dateISO` falls in, or null if
+ * outside the target table (before the cycle started or past its last week). */
+export function weightTargetForDate(
+  dateISO: string,
+  cycleStartISO: string,
+  targets: WeeklyWeightTarget[]
+): { lowLb: number; highLb: number } | null {
+  const week = weekIndexForDate(dateISO, cycleStartISO);
+  const t = targets.find((x) => x.week === week);
+  return t ? { lowLb: t.lowLb, highLb: t.highLb } : null;
+}
+
+// ── compound dose escalation readiness ──────────────────────────────────
+// Heuristic, not medical advice: "stalled" means the last 2 weeks of weight
+// are essentially flat. Doesn't (and can't) check diet adherence — that's
+// left for the person to confirm themselves before acting on this.
+const STALL_THRESHOLD_LB_PER_WEEK = 0.25;
+const MIN_WEEKS_AT_DOSE = 5;
+
+export interface EscalationCheck {
+  weeksAtDose: number;
+  stalled: boolean;
+  ready: boolean;
+}
+
+export function escalationCheck(
+  compound: CycleCompound,
+  measurements: Measurement[],
+  todayISO_: string
+): EscalationCheck {
+  const weeksAtDose = Math.max(
+    0,
+    Math.floor(daysBetween(compound.startDate, todayISO_) / 7)
+  );
+  const recent = measurements
+    .filter((m) => {
+      if (m.weight === undefined) return false;
+      const age = daysBetween(m.date, todayISO_);
+      return age >= 0 && age <= 14;
+    })
+    .map((m) => ({ date: m.date, value: m.weight! }));
+  const trend = trendPerWeek(recent);
+  const stalled = trend !== null && Math.abs(trend) < STALL_THRESHOLD_LB_PER_WEEK;
+  return { weeksAtDose, stalled, ready: weeksAtDose >= MIN_WEEKS_AT_DOSE && stalled };
 }
 
 export interface BodyReport {

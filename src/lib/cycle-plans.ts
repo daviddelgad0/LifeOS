@@ -1,4 +1,44 @@
-import type { Routine } from "./types";
+import type { CycleCompound, Routine, WeeklyWeightTarget } from "./types";
+
+// From the 12-week recomp cycle handoff (DEXA Aug 26, 2026). Week 1 starts
+// on the DEXA/handoff date; the weekly bands are the doc's own targets.
+export const CYCLE_START_DATE = "2026-08-26";
+
+export const CYCLE_WEEKLY_WEIGHT_TARGETS: WeeklyWeightTarget[] = [
+  { week: 1, lowLb: 158, highLb: 159 },
+  { week: 2, lowLb: 157.5, highLb: 159 },
+  { week: 3, lowLb: 157, highLb: 158.5 },
+  { week: 4, lowLb: 156.5, highLb: 158 },
+  { week: 5, lowLb: 156, highLb: 157.5 },
+  { week: 6, lowLb: 155.5, highLb: 157 },
+  { week: 7, lowLb: 155, highLb: 156.5 },
+  { week: 8, lowLb: 154.5, highLb: 156 },
+  { week: 9, lowLb: 154, highLb: 155.5 },
+  { week: 10, lowLb: 153, highLb: 155 },
+  { week: 11, lowLb: 152, highLb: 154 },
+  { week: 12, lowLb: 152, highLb: 155 },
+];
+
+// Retatrutide was already ~3 weeks into its current dose as of the Aug 26
+// handoff date, per the doc — its startDate is backdated accordingly.
+// Test/Clomiphene have no earlier date given, so they default to cycle start.
+export const CYCLE_COMPOUNDS: CycleCompound[] = [
+  {
+    name: "Testosterone Propionate",
+    doseLabel: "350 mg/week (50 mg daily SubQ)",
+    startDate: CYCLE_START_DATE,
+  },
+  {
+    name: "Retatrutide",
+    doseLabel: "2 mg/week",
+    startDate: "2026-08-05",
+  },
+  {
+    name: "Clomiphene",
+    doseLabel: "Throughout cycle",
+    startDate: CYCLE_START_DATE,
+  },
+];
 
 // Rest-time convention applied uniformly since the source plan doesn't
 // specify rests: 150s for the day's heaviest compound, 120s for secondary

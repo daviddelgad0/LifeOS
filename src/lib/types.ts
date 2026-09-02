@@ -101,6 +101,20 @@ export interface Measurement {
   thighs?: number;
 }
 
+/** One week's target weight band for a cycle, canonical lb. */
+export interface WeeklyWeightTarget {
+  week: number; // 1-indexed, relative to the cycle's start date
+  lowLb: number;
+  highLb: number;
+}
+
+/** A tracked compound's current dose — not a per-injection log. */
+export interface CycleCompound {
+  name: string;
+  doseLabel: string;
+  startDate: string; // ISO — when the CURRENT dose began
+}
+
 export type TaskCategory = "school" | "fitness" | "personal" | "job";
 export type TaskPriority = "low" | "medium" | "high";
 export type AssignmentType =

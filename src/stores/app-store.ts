@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ACHIEVEMENTS, levelFromXP } from "@/lib/xp";
 import { todayISO } from "@/lib/dates";
 import { SEED_ACHIEVEMENTS, SEED_XP } from "@/lib/seed";
-import type { CoachPersonality, Profile } from "@/lib/types";
+import type { CoachPersonality, CycleCompound, Profile, WeeklyWeightTarget } from "@/lib/types";
 
 export interface NotificationPrefs {
   tasks: boolean;
@@ -34,6 +34,10 @@ interface AppState {
   totalXP: number;
   achievements: Record<string, string>; // id -> ISO date unlocked
   lastCheckinWeek: string | null;
+  /** Active cycle's day-1 date, or null if none imported. */
+  cycleStartDate: string | null;
+  weeklyWeightTargets: WeeklyWeightTarget[];
+  compounds: CycleCompound[];
 
   setProfile: (patch: Partial<Profile>) => void;
   set: <K extends keyof AppState>(key: K, value: AppState[K]) => void;
@@ -83,6 +87,9 @@ export const useAppStore = create<AppState>()(
       totalXP: SEED_XP,
       achievements: SEED_ACHIEVEMENTS,
       lastCheckinWeek: null,
+      cycleStartDate: null,
+      weeklyWeightTargets: [],
+      compounds: [],
 
       setProfile: (patch) =>
         set((s) => ({ profile: { ...s.profile, ...patch } })),
