@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowRight,
   Dumbbell,
+  Download,
   MoreHorizontal,
   Pencil,
   Play,
@@ -29,6 +31,7 @@ import { CustomExerciseDialog } from "@/components/gym/custom-exercise-dialog";
 import { GymSelector } from "@/components/gym/gym-selector";
 import { WorkoutHistory } from "@/components/gym/workout-history";
 import { allExercises, getExercise } from "@/lib/exercises";
+import { PPL_CYCLE_ROUTINES } from "@/lib/cycle-plans";
 import { daysSinceByMuscle, MUSCLES, weeklySetTotals } from "@/lib/fitness";
 import { todayISO } from "@/lib/dates";
 import {
@@ -49,6 +52,7 @@ export function GymLogTab() {
   const customExercises = useWorkoutStore((s) => s.customExercises);
   const startWorkout = useWorkoutStore((s) => s.startWorkout);
   const deleteRoutine = useWorkoutStore((s) => s.deleteRoutine);
+  const addRoutine = useWorkoutStore((s) => s.addRoutine);
 
   const [editing, setEditing] = useState<Routine | "new" | null>(null);
   const [preview, setPreview] = useState<Exercise | null>(null);
@@ -71,6 +75,19 @@ export function GymLogTab() {
   const begin = (routine?: Routine) => {
     startWorkout(routine);
     router.push("/gym/workout");
+  };
+
+  const importPplCycle = () => {
+    const existing = new Set(routines.map((r) => r.name));
+    const missing = PPL_CYCLE_ROUTINES.filter((r) => !existing.has(r.name));
+    if (missing.length === 0) {
+      toast("Already imported", { description: "All 6 cycle routines are already in your list." });
+      return;
+    }
+    for (const r of missing) addRoutine(r);
+    toast(`Imported ${missing.length} routine${missing.length === 1 ? "" : "s"}`, {
+      description: "Push A/B, Pull A/B, Legs A/B are ready to start.",
+    });
   };
 
   const whoop = useWhoopToday();
@@ -165,7 +182,11 @@ export function GymLogTab() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-text-tertiary">Routines</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={importPplCycle}>
+              <Download data-icon="inline-start" className="size-3.5" />
+              Import 12-week PPL cycle
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
               <Plus data-icon="inline-start" className="size-3.5" />
               New routine
