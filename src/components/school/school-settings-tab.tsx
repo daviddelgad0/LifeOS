@@ -100,10 +100,35 @@ export function SchoolSettingsTab() {
         }),
       });
       if (!res.ok) throw new Error(`Sync failed (${res.status})`);
-      const data = await res.json();
-      toast.success("Pushed to Google Calendar", {
-        description: `${data.events} event${data.events === 1 ? "" : "s"} on your “LifeOS School” calendar.`,
-      });
+      const data: {
+        events: number;
+        failures?: { summary: string; reason: string }[];
+        skipped?: string[];
+      } = await res.json();
+      // Assignments with no due date never make it into the request body at
+      // all (filtered above), so they'd otherwise vanish with no explanation
+      // for why the count came in lower than expected.
+      const withoutDue = tasks.filter(
+        (t) => t.classId && ids.has(t.classId) && !t.due
+      ).length;
+      const problems = (data.failures?.length ?? 0) + (data.skipped?.length ?? 0) + withoutDue;
+      if (problems === 0) {
+        toast.success("Pushed to Google Calendar", {
+          description: `${data.events} event${data.events === 1 ? "" : "s"} on your “LifeOS School” calendar.`,
+        });
+      } else {
+        const reasons = [
+          ...(withoutDue > 0
+            ? [`${withoutDue} assignment${withoutDue === 1 ? "" : "s"} have no due date set`]
+            : []),
+          ...(data.skipped ?? []),
+          ...(data.failures ?? []).map((f) => `${f.summary}: ${f.reason}`),
+        ];
+        toast(`Pushed ${data.events}, skipped ${problems}`, {
+          description: reasons.slice(0, 4).join(" · "),
+          duration: 12000,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {

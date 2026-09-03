@@ -136,32 +136,60 @@ export async function POST(request: Request) {
     });
 
   let events = 0;
+  // Failures were previously silent — a bad event just didn't count and
+  // nothing said why. Capture what actually went wrong so a partial sync
+  // is debuggable instead of a mystery. Capped so one bad batch can't
+  // balloon the response.
+  const failures: { summary: string; reason: string }[] = [];
+  const skipped: string[] = [];
+  const recordFailure = async (summary: string, res: Response) => {
+    if (failures.length >= 15) return;
+    let reason = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      reason = body?.error?.message ?? reason;
+    } catch {
+      // Response wasn't JSON — keep the plain status.
+    }
+    failures.push({ summary, reason });
+  };
 
   // Class meetings → weekly recurring events for ~a semester (16 weeks).
   for (const c of body.classes ?? []) {
     for (const m of c.meetings ?? []) {
+      const summary = c.code ? `${c.name} (${c.code})` : c.name;
+      if (!m.start || !m.end) {
+        if (skipped.length < 15) skipped.push(`${summary} — missing meeting time`);
+        continue;
+      }
       const date = nextDateForWeekday(m.day);
-      const ok = await insert({
-        summary: c.code ? `${c.name} (${c.code})` : c.name,
+      const res = await insert({
+        summary,
         location: c.location || undefined,
         start: { dateTime: `${date}T${m.start}:00`, timeZone: tz },
         end: { dateTime: `${date}T${m.end}:00`, timeZone: tz },
         recurrence: ["RRULE:FREQ=WEEKLY;COUNT=16"],
       });
-      if (ok.ok) events++;
+      if (res.ok) events++;
+      else await recordFailure(summary, res);
     }
   }
 
   // Assignments → all-day events on the due date.
   for (const a of body.assignments ?? []) {
-    if (!a.due) continue;
-    const ok = await insert({
-      summary: a.className ? `${a.title} — ${a.className}` : a.title,
+    const summary = a.className ? `${a.title} — ${a.className}` : a.title;
+    if (!a.due) {
+      if (skipped.length < 15) skipped.push(`${summary} — no due date`);
+      continue;
+    }
+    const res = await insert({
+      summary,
       start: { date: a.due },
       end: { date: a.due },
     });
-    if (ok.ok) events++;
+    if (res.ok) events++;
+    else await recordFailure(summary, res);
   }
 
-  return NextResponse.json({ ok: true, action: "sync", events });
+  return NextResponse.json({ ok: true, action: "sync", events, failures, skipped });
 }
